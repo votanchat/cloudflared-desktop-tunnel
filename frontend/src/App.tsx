@@ -7,29 +7,62 @@ import './App.css';
 function App() {
   const [activeTab, setActiveTab] = useState('tunnel');
   const [tunnelStatus, setTunnelStatus] = useState<any>(null);
+  const [wailsReady, setWailsReady] = useState(false);
+
+  // Check if Wails runtime is ready
+  useEffect(() => {
+    const checkWails = () => {
+      if (window.go && window.go.app && window.go.app.App) {
+        setWailsReady(true);
+        return true;
+      }
+      return false;
+    };
+
+    // Try immediately
+    if (checkWails()) return;
+
+    // Otherwise poll every 100ms for up to 5 seconds
+    let attempts = 0;
+    const interval = setInterval(() => {
+      attempts++;
+      if (checkWails() || attempts > 50) {
+        clearInterval(interval);
+      }
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, []);
 
   // Fetch tunnel status periodically
   useEffect(() => {
+    if (!wailsReady) return;
+
     const fetchStatus = async () => {
       try {
-        // Call Wails backend method
-        // This will be automatically bound by Wails
-        // @ts-ignore
-        if (window.go && window.go.app && window.go.app.App) {
-          // @ts-ignore
-          const status = await window.go.app.App.GetTunnelStatus();
-          setTunnelStatus(status);
-        }
+        const status = await window.go.app.App.GetTunnelStatus();
+        setTunnelStatus(status);
       } catch (error) {
         console.error('Failed to fetch tunnel status:', error);
       }
     };
 
     fetchStatus();
-    const interval = setInterval(fetchStatus, 3000); // Update every 3 seconds
+    const interval = setInterval(fetchStatus, 3000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [wailsReady]);
+
+  if (!wailsReady) {
+    return (
+      <div className="app" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+        <div style={{ textAlign: 'center', color: 'white' }}>
+          <h2>🔄 Loading Wails Runtime...</h2>
+          <p>Please make sure you're running: <code>wails dev</code></p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="app">

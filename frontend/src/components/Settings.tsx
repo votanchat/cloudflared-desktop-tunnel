@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 function Settings() {
   const [config, setConfig] = useState<any>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     loadConfig();
@@ -10,24 +11,38 @@ function Settings() {
 
   const loadConfig = async () => {
     try {
-      // @ts-ignore
-      if (window.go && window.go.app && window.go.app.App) {
-        // @ts-ignore
-        const cfg = await window.go.app.App.GetConfig();
-        setConfig(cfg);
+      if (!window.go || !window.go.app || !window.go.app.App) {
+        throw new Error('Wails runtime not initialized');
       }
+      
+      const cfg = await window.go.app.App.GetConfig();
+      setConfig(cfg);
     } catch (error) {
       console.error('Failed to load config:', error);
+      // Set default config if loading fails
+      setConfig({
+        backendURL: 'https://api.example.com',
+        tunnelName: 'my-tunnel',
+        autoStart: false,
+        minimizeToTray: true,
+        refreshInterval: 300
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      // @ts-ignore
+      if (!window.go || !window.go.app || !window.go.app.App) {
+        throw new Error('Wails runtime not initialized');
+      }
+      
       await window.go.app.App.UpdateConfig(config);
       alert('Settings saved successfully!');
     } catch (error: any) {
+      console.error('Save config error:', error);
       alert(`Failed to save settings: ${error.message || error}`);
     } finally {
       setIsSaving(false);
@@ -38,8 +53,12 @@ function Settings() {
     setConfig({ ...config, [field]: value });
   };
 
-  if (!config) {
+  if (isLoading) {
     return <div>Loading settings...</div>;
+  }
+
+  if (!config) {
+    return <div>Error loading settings. Please refresh the page.</div>;
   }
 
   return (

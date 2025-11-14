@@ -10,9 +10,15 @@ function TunnelManager({ status }: TunnelManagerProps) {
   const handleStart = async () => {
     setIsLoading(true);
     try {
-      // @ts-ignore
+      // Check if Wails runtime is available
+      if (!window.go || !window.go.app || !window.go.app.App) {
+        throw new Error('Wails runtime not initialized. Please run: wails dev');
+      }
+      
       await window.go.app.App.StartTunnel();
+      console.log('Tunnel started successfully');
     } catch (error: any) {
+      console.error('Start tunnel error:', error);
       alert(`Failed to start tunnel: ${error.message || error}`);
     } finally {
       setIsLoading(false);
@@ -22,9 +28,14 @@ function TunnelManager({ status }: TunnelManagerProps) {
   const handleStop = async () => {
     setIsLoading(true);
     try {
-      // @ts-ignore
+      if (!window.go || !window.go.app || !window.go.app.App) {
+        throw new Error('Wails runtime not initialized. Please run: wails dev');
+      }
+      
       await window.go.app.App.StopTunnel();
+      console.log('Tunnel stopped successfully');
     } catch (error: any) {
+      console.error('Stop tunnel error:', error);
       alert(`Failed to stop tunnel: ${error.message || error}`);
     } finally {
       setIsLoading(false);
