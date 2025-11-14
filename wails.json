@@ -1,0 +1,24 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "cloudflared-desktop-tunnel",
+  "outputfilename": "cloudflared-tunnel",
+  "frontend:install": "npm install",
+  "frontend:build": "npm run build",
+  "frontend:dev:watcher": "npm run dev",
+  "frontend:dev:serverUrl": "http://localhost:5173",
+  "author": {
+    "name": "votanchat",
+    "email": ""
+  },
+  "info": {
+    "companyName": "votanchat",
+    "productName": "Cloudflared Desktop Tunnel",
+    "productVersion": "1.0.0",
+    "copyright": "Copyright © 2025",
+    "comments": "Cross-platform desktop app for managing Cloudflare Tunnels"
+  },
+  "nsisType": "multiple",
+  "wailsjsdir": "./frontend/src",
+  "version": "2",
+  "debounceMS": 750
+}
