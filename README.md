@@ -30,6 +30,9 @@ wails dev
 
 - **Embedded Binaries**: Bundle cloudflared binaries for Windows, macOS (Intel/ARM), and Linux (amd64/arm64) using Go's `embed` directive
 - **Cross-Platform**: Single codebase runs on Windows, macOS, and Linux
+- **Flexible Token Management**: 
+  - Auto-fetch tokens from backend API
+  - **Manual token input** for testing/development (no backend required!)
 - **Backend Integration**: Connect to backend API for token management and remote commands
 - **Modern UI**: Built with Wails v2 + React + TypeScript + Vite
 - **Auto-Update**: Receive and apply updates from backend
@@ -39,9 +42,31 @@ wails dev
 ## 📝 Quick Links
 
 - 🚀 [**Setup Guide (Start Here!)**](./SETUP.md) - Complete setup with troubleshooting
+- 🔑 [**Manual Token Guide**](./docs/MANUAL_TOKEN.md) - Use without backend for testing
 - 🏛️ [Architecture Documentation](./docs/ARCHITECTURE.md) - System design details
 - 🔌 [Backend API Specification](./docs/BACKEND_API.md) - How to build backend
 - ⚡ [Quick Start](./docs/QUICKSTART.md) - Get running in 5 minutes
+
+## 💫 New: Manual Token Support
+
+**No backend? No problem!** You can now start tunnels with manual tokens:
+
+1. Get your tunnel token from Cloudflare:
+   ```bash
+   cloudflared tunnel token <tunnel-name>
+   ```
+
+2. In the app, click **"✏️ Manual Token"** button
+
+3. Paste your token and click **Start Tunnel**
+
+**Perfect for:**
+- ✅ Testing without backend infrastructure
+- ✅ Development and debugging
+- ✅ Quick demos and POCs
+- ✅ Temporary setups
+
+See [Manual Token Guide](./docs/MANUAL_TOKEN.md) for details.
 
 ## 📋 Prerequisites
 
@@ -176,6 +201,25 @@ At runtime, the app:
 4. Runs the binary with appropriate flags
 5. Cleans up on application shutdown
 
+### Token Management
+
+The app supports two ways to get tunnel tokens:
+
+**1. Backend API (Production)**
+```go
+// Automatic token fetch from backend
+GET /api/token -> {"token": "...", "expiresAt": "..."}
+```
+
+**2. Manual Token (Development/Testing)**
+```go
+// User provides token directly in UI
+// Perfect when backend is not available
+StartTunnel(manualToken string)
+```
+
+See [Manual Token Guide](./docs/MANUAL_TOKEN.md) for details.
+
 ### Backend Communication
 
 The app connects to a backend API for:
@@ -200,7 +244,7 @@ See [Backend API Documentation](./docs/BACKEND_API.md) for full API specificatio
 
 ## 🎨 Frontend Components
 
-- **TunnelManager**: Main control panel for starting/stopping tunnel
+- **TunnelManager**: Main control panel for starting/stopping tunnel with manual token support
 - **StatusDisplay**: Real-time tunnel status and connection info
 - **Settings**: Configure backend URL and tunnel parameters
 - **LogsViewer**: Display cloudflared output logs
@@ -290,9 +334,14 @@ Verify they exist:
 ls -lh binaries/*/*/*
 ```
 
+### Testing without backend
+
+Use manual token feature! See [Manual Token Guide](./docs/MANUAL_TOKEN.md).
+
 ## 🔒 Security Notes
 
 - Tokens are never persisted to disk
+- Manual tokens are cleared from UI after use
 - Temporary binary files are cleaned up on shutdown
 - Always use official Cloudflare binaries from https://github.com/cloudflare/cloudflared/releases
 - Implement authentication in your backend API for production use
@@ -317,4 +366,5 @@ For issues and questions:
 - 🐛 [GitHub Issues](https://github.com/votanchat/cloudflared-desktop-tunnel/issues)
 - 💬 [GitHub Discussions](https://github.com/votanchat/cloudflared-desktop-tunnel/discussions)
 - 📚 [Setup Guide](./SETUP.md)
+- 🔑 [Manual Token Guide](./docs/MANUAL_TOKEN.md)
 - 🏛️ [Architecture Docs](./docs/ARCHITECTURE.md)
