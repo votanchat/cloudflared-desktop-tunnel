@@ -85,15 +85,26 @@ func (a *App) Shutdown(ctx context.Context) {
 }
 
 // StartTunnel starts the cloudflared tunnel
-func (a *App) StartTunnel() error {
+// If manualToken is provided and not empty, it will be used instead of fetching from backend
+func (a *App) StartTunnel(manualToken string) error {
 	if a.tunnel.IsRunning() {
 		return fmt.Errorf("tunnel is already running")
 	}
 
-	// Fetch token from backend
-	token, err := a.backendClient.FetchToken()
-	if err != nil {
-		return fmt.Errorf("failed to fetch token: %w", err)
+	var token string
+	var err error
+
+	// Check if manual token is provided
+	if manualToken != "" {
+		log.Println("Using manually provided token")
+		token = manualToken
+	} else {
+		// Fetch token from backend
+		log.Println("Fetching token from backend...")
+		token, err = a.backendClient.FetchToken()
+		if err != nil {
+			return fmt.Errorf("failed to fetch token from backend: %w", err)
+		}
 	}
 
 	return a.tunnel.Start(token)

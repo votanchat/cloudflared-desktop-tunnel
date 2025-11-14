@@ -6,7 +6,7 @@ declare global {
     go: {
       app: {
         App: {
-          StartTunnel(): Promise<void>;
+          StartTunnel(manualToken: string): Promise<void>;
           StopTunnel(): Promise<void>;
           GetTunnelStatus(): Promise<any>;
           GetConfig(): Promise<any>;

@@ -6,6 +6,8 @@ interface TunnelManagerProps {
 
 function TunnelManager({ status }: TunnelManagerProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const [manualToken, setManualToken] = useState('');
+  const [showTokenInput, setShowTokenInput] = useState(false);
 
   const handleStart = async () => {
     setIsLoading(true);
@@ -15,8 +17,14 @@ function TunnelManager({ status }: TunnelManagerProps) {
         throw new Error('Wails runtime not initialized. Please run: wails dev');
       }
       
-      await window.go.app.App.StartTunnel();
+      // Pass manual token (empty string if not provided)
+      await window.go.app.App.StartTunnel(manualToken);
       console.log('Tunnel started successfully');
+      
+      // Clear token after successful start for security
+      if (manualToken) {
+        setManualToken('');
+      }
     } catch (error: any) {
       console.error('Start tunnel error:', error);
       alert(`Failed to start tunnel: ${error.message || error}`);
@@ -60,6 +68,58 @@ function TunnelManager({ status }: TunnelManagerProps) {
           <span className="info-label">Tunnel Name:</span>
           <span className="info-value">{status?.tunnelName || 'N/A'}</span>
         </div>
+      </div>
+
+      {/* Manual Token Input Section */}
+      <div className="info-card" style={{ marginBottom: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+          <h3 style={{ margin: 0, fontSize: '1rem' }}>🔑 Token Configuration</h3>
+          <button
+            className="btn"
+            onClick={() => setShowTokenInput(!showTokenInput)}
+            style={{
+              padding: '6px 12px',
+              fontSize: '0.85rem',
+              background: showTokenInput ? '#f5576c' : '#667eea',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer'
+            }}
+          >
+            {showTokenInput ? '❌ Hide' : '✏️ Manual Token'}
+          </button>
+        </div>
+
+        {showTokenInput && (
+          <div>
+            <label className="form-label" style={{ fontSize: '0.9rem', marginBottom: '8px', display: 'block' }}>
+              Paste your Cloudflare Tunnel token here (optional)
+            </label>
+            <textarea
+              className="form-input"
+              value={manualToken}
+              onChange={(e) => setManualToken(e.target.value)}
+              placeholder="eyJhIjoiMTIzNDU2Nzg5MGFiY2RlZiIsInQiOiJhYmNkZWYxMi0zNDU2LTc4OTAtYWJjZC1lZjEyMzQ1Njc4OTAiLCJzIjoi..."
+              disabled={isRunning}
+              rows={3}
+              style={{
+                fontFamily: 'monospace',
+                fontSize: '0.85rem',
+                resize: 'vertical'
+              }}
+            />
+            <p style={{ fontSize: '0.85rem', color: '#6c757d', marginTop: '8px', marginBottom: 0 }}>
+              💡 <strong>Tip:</strong> Leave empty to fetch token from backend automatically.
+            </p>
+          </div>
+        )}
+
+        {!showTokenInput && (
+          <p style={{ fontSize: '0.9rem', color: '#6c757d', margin: 0 }}>
+            Token will be fetched from backend API when you start the tunnel.
+          </p>
+        )}
       </div>
 
       <div className="control-panel">
