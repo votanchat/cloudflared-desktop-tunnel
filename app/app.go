@@ -65,10 +65,14 @@ func (a *App) Shutdown(ctx context.Context) {
 	log.Println("Application shutting down...")
 
 	// Stop tunnel if running
-	if a.tunnel != nil && a.tunnel.IsRunning() {
-		if err := a.tunnel.Stop(); err != nil {
-			log.Printf("Error stopping tunnel: %v", err)
+	if a.tunnel != nil {
+		if a.tunnel.IsRunning() {
+			if err := a.tunnel.Stop(); err != nil {
+				log.Printf("Error stopping tunnel: %v", err)
+			}
 		}
+		// Clean up cached binary
+		a.tunnel.Cleanup()
 	}
 
 	// Stop backend client
