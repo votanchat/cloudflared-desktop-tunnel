@@ -20,7 +20,7 @@ var (
 func init() {
 	switch runtime.GOARCH {
 	case "amd64":
-		Cloudflar edBinary = amd64Binary
+		CloudflaredBinary = amd64Binary
 	case "arm64":
 		CloudflaredBinary = arm64Binary
 	default:
