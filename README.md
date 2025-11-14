@@ -2,6 +2,30 @@
 
 > Cross-platform desktop application for managing Cloudflare Tunnels with embedded `cloudflared` binary
 
+## ⚠️ IMPORTANT: Binary Download Required
+
+**This repository does NOT include cloudflared binaries.** You must download them separately before building.
+
+### Quick Setup
+
+```bash
+# Clone repository
+git clone https://github.com/votanchat/cloudflared-desktop-tunnel.git
+cd cloudflared-desktop-tunnel
+
+# Download binaries using provided script
+./scripts/download-binaries.sh  # Linux/macOS
+# OR
+.\scripts\download-binaries.ps1  # Windows PowerShell
+
+# Install dependencies and run
+go mod download
+cd frontend && npm install && cd ..
+wails dev
+```
+
+📚 **For detailed setup instructions, see [SETUP.md](./SETUP.md)**
+
 ## 🚀 Features
 
 - **Embedded Binaries**: Bundle cloudflared binaries for Windows, macOS (Intel/ARM), and Linux (amd64/arm64) using Go's `embed` directive
@@ -9,7 +33,15 @@
 - **Backend Integration**: Connect to backend API for token management and remote commands
 - **Modern UI**: Built with Wails v2 + React + TypeScript + Vite
 - **Auto-Update**: Receive and apply updates from backend
+- **Real-time Logs**: Stream cloudflared output directly in the UI
 - **System Tray**: Minimize to system tray for background operation
+
+## 📝 Quick Links
+
+- 🚀 [**Setup Guide (Start Here!)**](./SETUP.md) - Complete setup with troubleshooting
+- 🏛️ [Architecture Documentation](./docs/ARCHITECTURE.md) - System design details
+- 🔌 [Backend API Specification](./docs/BACKEND_API.md) - How to build backend
+- ⚡ [Quick Start](./docs/QUICKSTART.md) - Get running in 5 minutes
 
 ## 📋 Prerequisites
 
@@ -46,7 +78,20 @@ cd cloudflared-desktop-tunnel
 
 ### 2. Download cloudflared binaries
 
-Download the official cloudflared binaries from [Cloudflare's releases](https://github.com/cloudflare/cloudflared/releases) and place them in the `binaries/` directory:
+**Option A: Use automated script (Recommended)**
+
+```bash
+# Linux/macOS
+chmod +x scripts/download-binaries.sh
+./scripts/download-binaries.sh
+
+# Windows PowerShell
+.\scripts\download-binaries.ps1
+```
+
+**Option B: Manual download**
+
+Download official binaries from [Cloudflare's releases](https://github.com/cloudflare/cloudflared/releases/latest) and place them in:
 
 ```
 binaries/
@@ -58,6 +103,12 @@ binaries/
 └── linux/
     ├── cloudflared-linux-amd64
     └── cloudflared-linux-arm64
+```
+
+**Make binaries executable (Linux/macOS):**
+```bash
+chmod +x binaries/darwin/cloudflared-*
+chmod +x binaries/linux/cloudflared-*
 ```
 
 ### 3. Install dependencies
@@ -91,7 +142,7 @@ wails build -platform windows/amd64
 # macOS Intel
 wails build -platform darwin/amd64
 
-# macOS ARM (M1/M2)
+# macOS ARM (M1/M2/M3)
 wails build -platform darwin/arm64
 
 # Linux
@@ -145,6 +196,8 @@ type BackendClient struct {
 // WS   /api/commands    - Receive real-time commands
 ```
 
+See [Backend API Documentation](./docs/BACKEND_API.md) for full API specification.
+
 ## 🎨 Frontend Components
 
 - **TunnelManager**: Main control panel for starting/stopping tunnel
@@ -164,6 +217,11 @@ Create a `config.json` file or use the UI settings:
   "minimizeToTray": true
 }
 ```
+
+Config file location:
+- **Windows**: `%APPDATA%\cloudflared-desktop-tunnel\config.json`
+- **macOS**: `~/Library/Application Support/cloudflared-desktop-tunnel/config.json`
+- **Linux**: `~/.config/cloudflared-desktop-tunnel/config.json`
 
 ## 📝 Development
 
@@ -194,6 +252,8 @@ Create a `config.json` file or use the UI settings:
 │   │   ├── components/
 │   │   └── hooks/
 │   └── package.json
+├── docs/                  # Documentation
+├── scripts/               # Helper scripts
 └── build/                 # Output directory
 ```
 
@@ -202,13 +262,48 @@ Create a `config.json` file or use the UI settings:
 wails generate module
 ```
 
+## ⚠️ Common Issues
+
+### "Cannot read properties of undefined (reading 'app')"
+
+This means Wails runtime is not initialized. Make sure you're running:
+```bash
+wails dev  # ✅ Correct
+```
+
+NOT:
+```bash
+npm run dev  # ❌ Wrong - this won't work!
+```
+
+See [SETUP.md](./SETUP.md) for detailed troubleshooting.
+
+### Binary not found errors
+
+Make sure you've downloaded the cloudflared binaries:
+```bash
+./scripts/download-binaries.sh
+```
+
+Verify they exist:
+```bash
+ls -lh binaries/*/*/*
+```
+
+## 🔒 Security Notes
+
+- Tokens are never persisted to disk
+- Temporary binary files are cleaned up on shutdown
+- Always use official Cloudflare binaries from https://github.com/cloudflare/cloudflared/releases
+- Implement authentication in your backend API for production use
+
 ## 🤝 Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome! Please read [CONTRIBUTING.md](./CONTRIBUTING.md) for details.
 
 ## 📄 License
 
-MIT License - see LICENSE file for details
+MIT License - see [LICENSE](./LICENSE) file for details
 
 ## 🙏 Acknowledgments
 
@@ -218,4 +313,8 @@ MIT License - see LICENSE file for details
 
 ## 📞 Support
 
-For issues and questions, please use the [GitHub Issues](https://github.com/votanchat/cloudflared-desktop-tunnel/issues) page.
+For issues and questions:
+- 🐛 [GitHub Issues](https://github.com/votanchat/cloudflared-desktop-tunnel/issues)
+- 💬 [GitHub Discussions](https://github.com/votanchat/cloudflared-desktop-tunnel/discussions)
+- 📚 [Setup Guide](./SETUP.md)
+- 🏛️ [Architecture Docs](./docs/ARCHITECTURE.md)
