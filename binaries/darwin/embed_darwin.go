@@ -2,29 +2,5 @@
 
 package binaries
 
-import (
-	_ "embed"
-	"runtime"
-)
-
-// Embedded binaries for macOS (both Intel and ARM)
-var (
-	//go:embed cloudflared-darwin-amd64
-	amd64Binary []byte
-
-	//go:embed cloudflared-darwin-arm64
-	arm64Binary []byte
-)
-
-// init selects the correct binary based on architecture
-func init() {
-	switch runtime.GOARCH {
-	case "amd64":
-		CloudflaredBinary = amd64Binary
-	case "arm64":
-		CloudflaredBinary = arm64Binary
-	default:
-		// Fallback to amd64 if architecture is unknown
-		CloudflaredBinary = amd64Binary
-	}
-}
+// Note: Binaries are now downloaded at runtime from GitHub releases.
+// This file is kept for compatibility but no longer embeds binaries.

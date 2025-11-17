@@ -6,13 +6,20 @@ import (
 	"path/filepath"
 )
 
+// Route represents a tunnel route configuration
+type Route struct {
+	Hostname string `json:"hostname"` // e.g., "myapp.example.com"
+	Service  string `json:"service"`  // e.g., "http://localhost:3000"
+}
+
 // Config represents the application configuration
 type Config struct {
-	BackendURL      string `json:"backendURL"`
-	TunnelName      string `json:"tunnelName"`
-	AutoStart       bool   `json:"autoStart"`
-	MinimizeToTray  bool   `json:"minimizeToTray"`
-	RefreshInterval int    `json:"refreshInterval"` // in seconds
+	BackendURL      string  `json:"backendURL"`
+	TunnelName      string  `json:"tunnelName"`
+	AutoStart       bool    `json:"autoStart"`
+	MinimizeToTray  bool    `json:"minimizeToTray"`
+	RefreshInterval int     `json:"refreshInterval"` // in seconds
+	Routes          []Route `json:"routes"`         // Domain routes for tunnel
 }
 
 // DefaultConfig returns a default configuration
@@ -23,7 +30,46 @@ func DefaultConfig() *Config {
 		AutoStart:       false,
 		MinimizeToTray:  true,
 		RefreshInterval: 300, // 5 minutes
+		Routes:          []Route{}, // Empty routes by default
 	}
+}
+
+// AddRoute adds a new route to the configuration
+func (c *Config) AddRoute(hostname, service string) {
+	// Check if route already exists
+	for i := range c.Routes {
+		if c.Routes[i].Hostname == hostname {
+			// Update existing route
+			c.Routes[i].Service = service
+			return
+		}
+	}
+	// Add new route
+	c.Routes = append(c.Routes, Route{
+		Hostname: hostname,
+		Service:  service,
+	})
+}
+
+// RemoveRoute removes a route by hostname
+func (c *Config) RemoveRoute(hostname string) bool {
+	for i := range c.Routes {
+		if c.Routes[i].Hostname == hostname {
+			c.Routes = append(c.Routes[:i], c.Routes[i+1:]...)
+			return true
+		}
+	}
+	return false
+}
+
+// GetRoute returns a route by hostname
+func (c *Config) GetRoute(hostname string) *Route {
+	for _, route := range c.Routes {
+		if route.Hostname == hostname {
+			return &route
+		}
+	}
+	return nil
 }
 
 // getConfigPath returns the path to the config file

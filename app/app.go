@@ -39,6 +39,8 @@ func (a *App) Startup(ctx context.Context) {
 
 	// Initialize tunnel manager
 	a.tunnel = NewTunnelManager(a.config.TunnelName)
+	// Set config reference for route management
+	a.tunnel.SetConfig(a.config)
 
 	// Auto-start tunnel if configured
 	if a.config.AutoStart {
@@ -142,4 +144,33 @@ func (a *App) UpdateConfig(config *Config) error {
 // Greet returns a greeting for the given name
 func (a *App) Greet(name string) string {
 	return fmt.Sprintf("Hello %s, welcome to Cloudflared Desktop Tunnel!", name)
+}
+
+// AddRoute adds a route to the configuration
+func (a *App) AddRoute(hostname, service string) error {
+	a.config.AddRoute(hostname, service)
+	if err := a.config.Save(); err != nil {
+		return fmt.Errorf("failed to save config: %w", err)
+	}
+	// Update tunnel config reference
+	a.tunnel.SetConfig(a.config)
+	return nil
+}
+
+// RemoveRoute removes a route from the configuration
+func (a *App) RemoveRoute(hostname string) error {
+	if !a.config.RemoveRoute(hostname) {
+		return fmt.Errorf("route not found: %s", hostname)
+	}
+	if err := a.config.Save(); err != nil {
+		return fmt.Errorf("failed to save config: %w", err)
+	}
+	// Update tunnel config reference
+	a.tunnel.SetConfig(a.config)
+	return nil
+}
+
+// GetRoutes returns all configured routes
+func (a *App) GetRoutes() []Route {
+	return a.config.Routes
 }

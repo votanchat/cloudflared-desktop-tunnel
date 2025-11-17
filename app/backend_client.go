@@ -23,6 +23,14 @@ type BackendClient struct {
 	commandsCh chan Command
 }
 
+// convertHTTPToWS converts HTTP(S) URL to WS(S)
+func convertHTTPToWS(baseURL string) string {
+	if len(baseURL) > 4 && baseURL[:4] == "http" {
+		return "ws" + baseURL[4:]
+	}
+	return baseURL
+}
+
 // Command represents a command from the backend
 type Command struct {
 	Type    string                 `json:"type"`    // "update", "restart", "patch", etc.
@@ -124,10 +132,7 @@ func (bc *BackendClient) ReportStatus(status map[string]interface{}) error {
 func (bc *BackendClient) connectWebSocket(ctx context.Context) {
 	for bc.running {
 		// Convert http(s) to ws(s)
-		wsURL := bc.baseURL + "/api/commands"
-		if len(wsURL) > 4 && wsURL[:4] == "http" {
-			wsURL = "ws" + wsURL[4:]
-		}
+		wsURL := convertHTTPToWS(bc.baseURL) + "/api/commands"
 
 		log.Printf("Connecting to WebSocket: %s", wsURL)
 

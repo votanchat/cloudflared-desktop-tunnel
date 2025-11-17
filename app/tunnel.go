@@ -1,8 +1,6 @@
 package app
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"log"
@@ -10,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 
 	"github.com/votanchat/cloudflared-desktop-tunnel/binaries"
@@ -22,7 +21,8 @@ type TunnelManager struct {
 	cmd        *exec.Cmd
 	tunnelName string
 	logs       []string
-	binaryPath string // Cached binary path
+	binaryPath string  // Cached binary path
+	config     *Config // Reference to config for routes
 }
 
 // NewTunnelManager creates a new tunnel manager
@@ -31,6 +31,13 @@ func NewTunnelManager(tunnelName string) *TunnelManager {
 		tunnelName: tunnelName,
 		logs:       make([]string, 0, 100),
 	}
+}
+
+// SetConfig sets the config reference for route management
+func (tm *TunnelManager) SetConfig(config *Config) {
+	tm.mu.Lock()
+	defer tm.mu.Unlock()
+	tm.config = config
 }
 
 // Start starts the cloudflared tunnel with the given token
@@ -53,8 +60,24 @@ func (tm *TunnelManager) Start(token string) error {
 	log.Printf("Using cloudflared binary: %s", binaryPath)
 	log.Printf("Runtime: GOOS=%s, GOARCH=%s", runtime.GOOS, runtime.GOARCH)
 
-	// Prepare the cloudflared command
-	tm.cmd = exec.Command(binaryPath, "tunnel", "run", "--token", token)
+	// Check if we have routes configured
+	if tm.config != nil && len(tm.config.Routes) > 0 {
+		// Use config file with routes
+		configPath, err := tm.generateConfigFile(token)
+		if err != nil {
+			return fmt.Errorf("failed to generate config file: %w", err)
+		}
+		log.Printf("Using config file with %d route(s): %s", len(tm.config.Routes), configPath)
+		for _, route := range tm.config.Routes {
+			log.Printf("  Route: %s -> %s", route.Hostname, route.Service)
+		}
+		// Use both --token and --config (token for auth, config for routes)
+		tm.cmd = exec.Command(binaryPath, "tunnel", "run", "--token", token, "--config", configPath)
+	} else {
+		// Use token directly (no routes, routes managed via Cloudflare Dashboard)
+		log.Println("Using token mode (routes managed via Cloudflare Dashboard)")
+		tm.cmd = exec.Command(binaryPath, "tunnel", "run", "--token", token)
+	}
 
 	// Capture stdout and stderr
 	stdout, err := tm.cmd.StdoutPipe()
@@ -124,23 +147,20 @@ func (tm *TunnelManager) GetLogs() []string {
 	return tm.logs
 }
 
-// ensureBinary ensures the cloudflared binary is extracted and ready to use
-// It caches the binary and only extracts once
+// ensureBinary ensures the cloudflared binary is downloaded and ready to use
+// It caches the binary and only downloads once
 func (tm *TunnelManager) ensureBinary() (string, error) {
 	// If we already have a cached binary path, verify it exists
 	if tm.binaryPath != "" {
 		if _, err := os.Stat(tm.binaryPath); err == nil {
-			log.Printf("Using cached binary: %s", tm.binaryPath)
-			return tm.binaryPath, nil
+			if tm.isBinaryValid(tm.binaryPath) {
+				log.Printf("Using cached binary: %s", tm.binaryPath)
+				return tm.binaryPath, nil
+			}
+			log.Printf("Cached binary is invalid, will re-download")
+		} else {
+			log.Printf("Cached binary not found, will download")
 		}
-		// If file doesn't exist, we'll re-extract
-		log.Printf("Cached binary not found, will re-extract")
-	}
-
-	// Determine binary name based on OS and architecture
-	binaryName := fmt.Sprintf("cloudflared-%s-%s", runtime.GOOS, runtime.GOARCH)
-	if runtime.GOOS == "windows" {
-		binaryName += ".exe"
 	}
 
 	// Create app-specific cache directory
@@ -149,34 +169,18 @@ func (tm *TunnelManager) ensureBinary() (string, error) {
 		return "", fmt.Errorf("failed to get cache dir: %w", err)
 	}
 
-	binaryPath := filepath.Join(cacheDir, binaryName)
-
-	// Check if binary already exists and is valid
-	if tm.isBinaryValid(binaryPath) {
-		log.Printf("Valid binary found in cache: %s", binaryPath)
-		return binaryPath, nil
+	// Download binary from GitHub releases
+	binaryPath, err := binaries.DownloadCloudflared(cacheDir)
+	if err != nil {
+		return "", fmt.Errorf("failed to download binary: %w", err)
 	}
 
-	// Extract embedded binary
-	log.Printf("Extracting embedded binary to: %s", binaryPath)
-	log.Printf("Binary size: %d bytes", len(binaries.CloudflaredBinary))
-
-	if len(binaries.CloudflaredBinary) == 0 {
-		return "", fmt.Errorf("embedded binary is empty - did you download the cloudflared binaries? See SETUP.md")
-	}
-
-	// Write the embedded binary to the cache file
-	if err := os.WriteFile(binaryPath, binaries.CloudflaredBinary, 0755); err != nil {
-		return "", fmt.Errorf("failed to write binary: %w", err)
-	}
-
-	// Verify the extracted binary
+	// Verify the downloaded binary
 	if !tm.isBinaryValid(binaryPath) {
 		os.Remove(binaryPath)
-		return "", fmt.Errorf("extracted binary is not valid or not executable")
+		return "", fmt.Errorf("downloaded binary is not valid or not executable")
 	}
 
-	log.Printf("Binary extracted successfully: %s", binaryPath)
 	return binaryPath, nil
 }
 
@@ -241,15 +245,87 @@ func getCacheDir() (string, error) {
 	return cacheDir, nil
 }
 
-// getEmbeddedBinaryHash returns the SHA256 hash of embedded binary for verification
-func getEmbeddedBinaryHash() string {
-	hash := sha256.Sum256(binaries.CloudflaredBinary)
-	return hex.EncodeToString(hash[:])
+// generateConfigFile generates a cloudflared YAML config file with routes
+func (tm *TunnelManager) generateConfigFile(token string) (string, error) {
+	// Get config directory
+	configDir, err := getConfigDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to get config dir: %w", err)
+	}
+
+	configPath := filepath.Join(configDir, "tunnel-config.yaml")
+
+	// Build YAML content with pre-allocated capacity
+	yaml := strings.Builder{}
+	yaml.Grow(256 + len(tm.config.Routes)*64) // Pre-allocate for efficiency
+	yaml.WriteString("# Cloudflared tunnel configuration\n")
+	yaml.WriteString("# Generated automatically by cloudflared-desktop-tunnel\n\n")
+
+	// Note: cloudflared doesn't support token in config file
+	// We'll use --token flag separately, config file only for ingress routes
+	yaml.WriteString("# Tunnel will be authenticated via --token flag\n\n")
+
+	// Add ingress routes
+	yaml.WriteString("ingress:\n")
+	for _, route := range tm.config.Routes {
+		yaml.WriteString("  - hostname: ")
+		yaml.WriteString(route.Hostname)
+		yaml.WriteString("\n    service: ")
+		yaml.WriteString(route.Service)
+		yaml.WriteString("\n")
+	}
+
+	// Add catch-all rule (required by cloudflared)
+	yaml.WriteString("  - service: http_status:404\n")
+
+	// Write to file
+	yamlBytes := []byte(yaml.String())
+	if err := os.WriteFile(configPath, yamlBytes, 0644); err != nil {
+		return "", fmt.Errorf("failed to write config file: %w", err)
+	}
+
+	log.Printf("Generated tunnel config file: %s", configPath)
+	return configPath, nil
+}
+
+// getConfigDir returns the config directory for storing tunnel config files
+func getConfigDir() (string, error) {
+	// Use OS-specific config directory
+	var baseDir string
+	var err error
+
+	switch runtime.GOOS {
+	case "darwin":
+		homeDir, _ := os.UserHomeDir()
+		baseDir = filepath.Join(homeDir, "Library", "Application Support")
+	case "windows":
+		baseDir, err = os.UserConfigDir()
+		if err != nil {
+			return "", err
+		}
+	default: // linux
+		homeDir, _ := os.UserHomeDir()
+		xdgConfig := os.Getenv("XDG_CONFIG_HOME")
+		if xdgConfig != "" {
+			baseDir = xdgConfig
+		} else {
+			baseDir = filepath.Join(homeDir, ".config")
+		}
+	}
+
+	// Create app-specific subdirectory
+	configDir := filepath.Join(baseDir, "cloudflared-desktop-tunnel")
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create config directory: %w", err)
+	}
+
+	return configDir, nil
 }
 
 // readLogs reads logs from the given pipe and stores them
 func (tm *TunnelManager) readLogs(pipe io.ReadCloser, source string) {
-	buf := make([]byte, 1024)
+	defer pipe.Close()
+	buf := make([]byte, 4096) // Larger buffer for better I/O efficiency
 	for {
 		n, err := pipe.Read(buf)
 		if n > 0 {
@@ -258,9 +334,10 @@ func (tm *TunnelManager) readLogs(pipe io.ReadCloser, source string) {
 
 			tm.mu.Lock()
 			tm.logs = append(tm.logs, line)
-			// Keep only last 100 lines
+			// Keep only last 100 lines - use slice reslicing instead of re-allocation
 			if len(tm.logs) > 100 {
-				tm.logs = tm.logs[len(tm.logs)-100:]
+				copy(tm.logs, tm.logs[len(tm.logs)-100:])
+				tm.logs = tm.logs[:100]
 			}
 			tm.mu.Unlock()
 		}

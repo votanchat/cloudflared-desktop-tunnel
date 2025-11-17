@@ -2,11 +2,5 @@
 
 package binaries
 
-import (
-	_ "embed"
-)
-
-// CloudflaredBinary is the embedded cloudflared binary for Windows AMD64
-//
-//go:embed cloudflared-windows-amd64.exe
-var CloudflaredBinary []byte
+// Note: Binaries are now downloaded at runtime from GitHub releases.
+// This file is kept for compatibility but no longer embeds binaries.
