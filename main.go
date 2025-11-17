@@ -13,6 +13,8 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/windows"
 )
 
+var mainLogger = app.GetLogger("MAIN")
+
 //go:embed all:frontend/dist
 var assets embed.FS
 
@@ -55,6 +57,7 @@ func main() {
 	})
 
 	if err != nil {
+		mainLogger.Error("Error starting application: %v", err)
 		log.Fatal("Error starting application:", err)
 	}
 }

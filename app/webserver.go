@@ -2,7 +2,6 @@ package app
 
 import (
 	"fmt"
-	"log"
 	"net"
 	"sync"
 
@@ -22,7 +21,7 @@ type WebServerManager struct {
 func NewWebServerManager() *WebServerManager {
 	// Disable Gin debug logging in production
 	gin.SetMode(gin.ReleaseMode)
-	
+
 	return &WebServerManager{
 		engine: gin.Default(),
 	}
@@ -51,16 +50,13 @@ func (ws *WebServerManager) StartWithPort(port int) error {
 	ws.port = port
 	ws.listener = listener
 
-	log.Printf("Web server will use port: %d", port)
-
-	// Setup routes
+	serverLogger.Info("Web server will use port: %d", port)
 	ws.setupRoutes()
 
-	// Start web server in a goroutine using the listener we already created
 	go func() {
-		log.Printf("Starting Gin web server on port %d", port)
+		serverLogger.Info("Starting Gin web server on port %d", port)
 		if err := ws.engine.RunListener(listener); err != nil && err.Error() != "http: Server closed" {
-			log.Printf("Web server error: %v", err)
+			serverLogger.Error("Web server error: %v", err)
 		}
 	}()
 
@@ -83,21 +79,17 @@ func (ws *WebServerManager) Start() (int, error) {
 		return 0, fmt.Errorf("failed to find available port: %w", err)
 	}
 
-	// Get the actual port assigned by OS
 	port := listener.Addr().(*net.TCPAddr).Port
 	ws.port = port
 	ws.listener = listener
 
-	log.Printf("Web server will use port: %d", port)
-
-	// Setup routes
+	serverLogger.Info("Web server will use port: %d", port)
 	ws.setupRoutes()
 
-	// Start web server in a goroutine using the listener we already created
 	go func() {
-		log.Printf("Starting Gin web server on port %d", port)
+		serverLogger.Info("Starting Gin web server on port %d", port)
 		if err := ws.engine.RunListener(listener); err != nil && err.Error() != "http: Server closed" {
-			log.Printf("Web server error: %v", err)
+			serverLogger.Error("Web server error: %v", err)
 		}
 	}()
 
@@ -114,12 +106,8 @@ func (ws *WebServerManager) Stop() error {
 		return fmt.Errorf("web server is not running")
 	}
 
-	log.Printf("Stopping web server on port %d", ws.port)
+	serverLogger.Info("Stopping web server on port %d", ws.port)
 	ws.running = false
-	
-	// Gin doesn't have a direct Close method, the server shuts down gracefully
-	// when the process exits
-
 	return nil
 }
 
@@ -225,5 +213,5 @@ func (ws *WebServerManager) statusPageHandler(c *gin.Context) {
 func (ws *WebServerManager) setupHTMLTemplate() {
 	// Routes are already set up in setupRoutes()
 	// This function is kept for API compatibility
-	log.Printf("Web server routes configured for port %d", ws.port)
+	serverLogger.Debug("Web server routes configured for port %d", ws.port)
 }

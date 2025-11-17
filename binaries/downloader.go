@@ -14,6 +14,39 @@ import (
 	"time"
 )
 
+// Logger interface for binary downloader
+type Logger interface {
+	Info(format string, args ...interface{})
+	Warn(format string, args ...interface{})
+	Error(format string, args ...interface{})
+	Debug(format string, args ...interface{})
+}
+
+var binaryLogger Logger = &defaultLogger{}
+
+type defaultLogger struct{}
+
+func (l *defaultLogger) Info(format string, args ...interface{}) {
+	log.Printf("[BINARY] "+format, args...)
+}
+
+func (l *defaultLogger) Warn(format string, args ...interface{}) {
+	log.Printf("[BINARY] WARN: "+format, args...)
+}
+
+func (l *defaultLogger) Error(format string, args ...interface{}) {
+	log.Printf("[BINARY] ERROR: "+format, args...)
+}
+
+func (l *defaultLogger) Debug(format string, args ...interface{}) {
+	log.Printf("[BINARY] DEBUG: "+format, args...)
+}
+
+// SetLogger sets a custom logger for the binaries package
+func SetLogger(logger Logger) {
+	binaryLogger = logger
+}
+
 // GitHubRelease represents a GitHub release
 type GitHubRelease struct {
 	TagName string `json:"tag_name"`
@@ -35,39 +68,36 @@ func DownloadCloudflared(cacheDir string) (string, error) {
 
 	binaryPath := filepath.Join(cacheDir, binaryName)
 
-	// Check if binary already exists and is valid
+	const minSize = 10 * 1024 * 1024 // 10MB
+
 	if info, err := os.Stat(binaryPath); err == nil {
-		// Check if file is valid (at least 10MB)
-		if info.Size() >= 10*1024*1024 {
-			log.Printf("Valid binary found in cache: %s", binaryPath)
+		if info.Size() >= minSize {
+			binaryLogger.Info("Valid binary found in cache: %s", binaryPath)
 			return binaryPath, nil
 		}
-		log.Printf("Cached binary is too small, will re-download")
+		binaryLogger.Warn("Cached binary is too small, will re-download")
 		os.Remove(binaryPath)
 	}
 
-	// Get latest version
-	log.Println("Fetching latest cloudflared version from GitHub...")
+	binaryLogger.Info("Fetching latest cloudflared version from GitHub...")
 	version, err := getLatestVersion()
 	if err != nil {
 		return "", fmt.Errorf("failed to get latest version: %w", err)
 	}
-	log.Printf("Latest version: %s", version)
+	binaryLogger.Info("Latest version: %s", version)
 
-	// Download binary
-	log.Printf("Downloading cloudflared binary for %s/%s...", runtime.GOOS, runtime.GOARCH)
+	binaryLogger.Info("Downloading cloudflared binary for %s/%s...", runtime.GOOS, runtime.GOARCH)
 	if err := downloadBinary(version, binaryPath); err != nil {
 		return "", fmt.Errorf("failed to download binary: %w", err)
 	}
 
-	// Set executable permissions on Unix systems
 	if runtime.GOOS != "windows" {
 		if err := os.Chmod(binaryPath, 0755); err != nil {
 			return "", fmt.Errorf("failed to set executable permissions: %w", err)
 		}
 	}
 
-	log.Printf("Binary downloaded successfully: %s", binaryPath)
+	binaryLogger.Info("Binary downloaded successfully: %s", binaryPath)
 	return binaryPath, nil
 }
 
@@ -130,7 +160,7 @@ func downloadBinary(version, outputPath string) error {
 		Timeout: 5 * time.Minute, // Binary downloads can take time
 	}
 
-	log.Printf("Downloading from: %s", downloadURL)
+	binaryLogger.Debug("Downloading from: %s", downloadURL)
 	resp, err := downloadClient.Get(downloadURL)
 	if err != nil {
 		return err

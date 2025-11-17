@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"time"
 
@@ -57,15 +56,10 @@ func NewBackendClient(baseURL string) *BackendClient {
 // Start starts the backend client
 func (bc *BackendClient) Start(ctx context.Context) {
 	bc.running = true
-	log.Println("Backend client started")
+	backendLogger.Info("Backend client started")
 
-	// Connect to WebSocket for real-time commands
 	go bc.connectWebSocket(ctx)
-
-	// Periodic token refresh
 	go bc.tokenRefreshLoop(ctx)
-
-	// Process commands
 	go bc.processCommands(ctx)
 }
 
@@ -76,7 +70,7 @@ func (bc *BackendClient) Stop() {
 		bc.ws.Close()
 	}
 	close(bc.commandsCh)
-	log.Println("Backend client stopped")
+	backendLogger.Info("Backend client stopped")
 }
 
 // FetchToken fetches a tunnel token from the backend
@@ -98,7 +92,7 @@ func (bc *BackendClient) FetchToken() (string, error) {
 	}
 
 	bc.token = tokenResp.Token
-	log.Printf("Token fetched successfully, expires at: %v", tokenResp.ExpiresAt)
+	backendLogger.Info("Token fetched successfully, expires at: %v", tokenResp.ExpiresAt)
 
 	return tokenResp.Token, nil
 }
@@ -130,44 +124,43 @@ func (bc *BackendClient) ReportStatus(status map[string]interface{}) error {
 
 // connectWebSocket connects to the backend WebSocket for real-time commands
 func (bc *BackendClient) connectWebSocket(ctx context.Context) {
-	for bc.running {
-		// Convert http(s) to ws(s)
-		wsURL := convertHTTPToWS(bc.baseURL) + "/api/commands"
+	const reconnectDelay = 10 * time.Second
 
-		log.Printf("Connecting to WebSocket: %s", wsURL)
+	for bc.running {
+		wsURL := convertHTTPToWS(bc.baseURL) + "/api/commands"
+		backendLogger.Info("Connecting to WebSocket: %s", wsURL)
 
 		ws, _, err := websocket.DefaultDialer.DialContext(ctx, wsURL, nil)
 		if err != nil {
-			log.Printf("Failed to connect to WebSocket: %v", err)
-			time.Sleep(10 * time.Second)
+			backendLogger.Warn("Failed to connect to WebSocket: %v, retrying in %v", err, reconnectDelay)
+			time.Sleep(reconnectDelay)
 			continue
 		}
 
 		bc.ws = ws
-		log.Println("WebSocket connected")
+		backendLogger.Info("WebSocket connected")
 
-		// Read messages
 		for bc.running {
 			var cmd Command
-			err := ws.ReadJSON(&cmd)
-			if err != nil {
-				log.Printf("WebSocket read error: %v", err)
+			if err := ws.ReadJSON(&cmd); err != nil {
+				backendLogger.Error("WebSocket read error: %v", err)
 				break
 			}
 
-			log.Printf("Received command: %s", cmd.Type)
+			backendLogger.Debug("Received command: %s", cmd.Type)
 			bc.commandsCh <- cmd
 		}
 
 		ws.Close()
-		log.Println("WebSocket disconnected, reconnecting in 10 seconds...")
-		time.Sleep(10 * time.Second)
+		backendLogger.Warn("WebSocket disconnected, reconnecting in %v...", reconnectDelay)
+		time.Sleep(reconnectDelay)
 	}
 }
 
 // tokenRefreshLoop periodically refreshes the token
 func (bc *BackendClient) tokenRefreshLoop(ctx context.Context) {
-	ticker := time.NewTicker(5 * time.Minute)
+	const refreshInterval = 5 * time.Minute
+	ticker := time.NewTicker(refreshInterval)
 	defer ticker.Stop()
 
 	for {
@@ -176,7 +169,7 @@ func (bc *BackendClient) tokenRefreshLoop(ctx context.Context) {
 			return
 		case <-ticker.C:
 			if _, err := bc.FetchToken(); err != nil {
-				log.Printf("Failed to refresh token: %v", err)
+				backendLogger.Error("Failed to refresh token: %v", err)
 			}
 		}
 	}
@@ -192,20 +185,21 @@ func (bc *BackendClient) processCommands(ctx context.Context) {
 			if !ok {
 				return
 			}
-
-			switch cmd.Type {
-			case "update":
-				log.Println("Received update command")
-				// TODO: Implement update logic
-			case "restart":
-				log.Println("Received restart command")
-				// TODO: Implement restart logic
-			case "patch":
-				log.Println("Received patch command")
-				// TODO: Implement patch logic
-			default:
-				log.Printf("Unknown command type: %s", cmd.Type)
-			}
+			bc.handleCommand(cmd)
 		}
+	}
+}
+
+// handleCommand handles a single command
+func (bc *BackendClient) handleCommand(cmd Command) {
+	switch cmd.Type {
+	case "update":
+		backendLogger.Info("Received update command (not implemented)")
+	case "restart":
+		backendLogger.Info("Received restart command (not implemented)")
+	case "patch":
+		backendLogger.Info("Received patch command (not implemented)")
+	default:
+		backendLogger.Warn("Unknown command type: %s", cmd.Type)
 	}
 }
