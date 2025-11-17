@@ -19,14 +19,6 @@ function Settings() {
       setConfig(cfg);
     } catch (error) {
       console.error('Failed to load config:', error);
-      // Set default config if loading fails
-      setConfig({
-        backendURL: 'https://api.example.com',
-        tunnelName: 'my-tunnel',
-        autoStart: false,
-        minimizeToTray: true,
-        refreshInterval: 300
-      });
     } finally {
       setIsLoading(false);
     }
