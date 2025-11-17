@@ -1,0 +1,15 @@
+{
+	"fixed": {
+		"file_version": "1.0.0"
+	},
+	"info": {
+		"0000": {
+			"ProductVersion": "1.0.0",
+			"CompanyName": "votanchat",
+			"FileDescription": "Cross-platform desktop app for managing Cloudflare Tunnels",
+			"LegalCopyright": "© now, My Company",
+			"ProductName": "Cloudflared Desktop Tunnel",
+			"Comments": "This is a comment"
+		}
+	}
+}

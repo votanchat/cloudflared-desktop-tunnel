@@ -53,21 +53,17 @@ type GitHubRelease struct {
 }
 
 // DownloadCloudflared downloads the cloudflared binary for the current platform
-// and saves it to the cache directory
 func DownloadCloudflared(cacheDir string) (string, error) {
-	// Ensure cache directory exists
 	if err := os.MkdirAll(cacheDir, 0755); err != nil {
 		return "", fmt.Errorf("failed to create cache directory: %w", err)
 	}
 
-	// Determine binary name based on OS and architecture
 	binaryName := fmt.Sprintf("cloudflared-%s-%s", runtime.GOOS, runtime.GOARCH)
 	if runtime.GOOS == "windows" {
 		binaryName += ".exe"
 	}
 
 	binaryPath := filepath.Join(cacheDir, binaryName)
-
 	const minSize = 10 * 1024 * 1024 // 10MB
 
 	if info, err := os.Stat(binaryPath); err == nil {
@@ -137,7 +133,6 @@ func downloadBinary(version, outputPath string) error {
 		downloadURL = fmt.Sprintf("%s/cloudflared-windows-amd64.exe", baseURL)
 		needsExtraction = false
 	case "darwin":
-		// macOS uses .tgz files
 		if runtime.GOARCH == "arm64" {
 			downloadURL = fmt.Sprintf("%s/cloudflared-darwin-arm64.tgz", baseURL)
 		} else {
@@ -155,9 +150,8 @@ func downloadBinary(version, outputPath string) error {
 		return fmt.Errorf("unsupported OS: %s", runtime.GOOS)
 	}
 
-	// Download the file
 	downloadClient := &http.Client{
-		Timeout: 5 * time.Minute, // Binary downloads can take time
+		Timeout: 5 * time.Minute,
 	}
 
 	binaryLogger.Debug("Downloading from: %s", downloadURL)
@@ -172,17 +166,14 @@ func downloadBinary(version, outputPath string) error {
 	}
 
 	if needsExtraction {
-		// Extract from .tgz (macOS)
 		return extractTgz(resp.Body, outputPath)
 	}
 
-	// Direct download (Windows, Linux)
 	return writeFile(resp.Body, outputPath)
 }
 
 // extractTgz extracts the cloudflared binary from a .tgz archive
 func extractTgz(r io.Reader, outputPath string) error {
-	// Create temporary file for the archive
 	tmpFile, err := os.CreateTemp("", "cloudflared-*.tgz")
 	if err != nil {
 		return fmt.Errorf("failed to create temp file: %w", err)
@@ -190,32 +181,26 @@ func extractTgz(r io.Reader, outputPath string) error {
 	defer os.Remove(tmpFile.Name())
 	defer tmpFile.Close()
 
-	// Write archive to temp file
 	if _, err := io.Copy(tmpFile, r); err != nil {
 		return fmt.Errorf("failed to write archive: %w", err)
 	}
 
-	// Close and reopen for reading
 	tmpFile.Close()
 
-	// Open the archive
 	file, err := os.Open(tmpFile.Name())
 	if err != nil {
 		return fmt.Errorf("failed to open archive: %w", err)
 	}
 	defer file.Close()
 
-	// Create gzip reader
 	gzr, err := gzip.NewReader(file)
 	if err != nil {
 		return fmt.Errorf("failed to create gzip reader: %w", err)
 	}
 	defer gzr.Close()
 
-	// Create tar reader
 	tr := tar.NewReader(gzr)
 
-	// Extract the cloudflared binary
 	for {
 		header, err := tr.Next()
 		if err == io.EOF {
@@ -225,9 +210,7 @@ func extractTgz(r io.Reader, outputPath string) error {
 			return fmt.Errorf("failed to read tar: %w", err)
 		}
 
-		// Look for the cloudflared binary (usually just "cloudflared" in the archive)
 		if header.Typeflag == tar.TypeReg && (header.Name == "cloudflared" || filepath.Base(header.Name) == "cloudflared") {
-			// Write to output path
 			outFile, err := os.Create(outputPath)
 			if err != nil {
 				return fmt.Errorf("failed to create output file: %w", err)

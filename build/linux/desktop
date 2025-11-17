@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Name=Cloudflared Desktop Tunnel
+Comment=Cross-platform desktop app for managing Cloudflare Tunnels
+# The Exec line includes %u to pass the URL to the application
+Exec=/usr/local/bin/cloudflared-desktop-tunnel-v3 %u
+Terminal=false
+Type=Application
+Icon=cloudflared-desktop-tunnel-v3
+Categories=Utility;
+StartupWMClass=cloudflared-desktop-tunnel-v3
+
+ 

@@ -1,4 +1,0 @@
-# Place cloudflared binaries in this directory
-# - cloudflared-darwin-amd64 (for Intel Macs)
-# - cloudflared-darwin-arm64 (for Apple Silicon M1/M2/M3)
-# Download from: https://github.com/cloudflare/cloudflared/releases

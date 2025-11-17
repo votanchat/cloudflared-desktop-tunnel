@@ -1,55 +1,6 @@
-# Binaries for programs and plugins
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
-
-# Test binary, built with `go test -c`
-*.test
-
-# Output of the go coverage tool
-*.out
-
-# Go workspace file
-go.work
-
-# Wails build output
-build/bin/
-build/darwin/
-build/windows/
-build/linux/
-
-# Frontend
-frontend/node_modules/
-frontend/dist/
-frontend/.vite/
-frontend/package-lock.json
-frontend/yarn.lock
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-*~
-.DS_Store
-
-# Wails
-wailsjs/
-
-# Config
-config.json
-
-# Cloudflared binaries (download separately)
-binaries/windows/cloudflared-windows-amd64.exe
-binaries/darwin/cloudflared-darwin-amd64
-binaries/darwin/cloudflared-darwin-arm64
-binaries/linux/cloudflared-linux-amd64
-binaries/linux/cloudflared-linux-arm64
-
-# Logs
-*.log
-
-# OS
-Thumbs.db
+.task
+bin
+frontend/dist
+frontend/node_modules
+build/linux/appimage/build
+build/windows/nsis/MicrosoftEdgeWebview2Setup.exe

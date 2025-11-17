@@ -1,4 +1,0 @@
-# Place cloudflared binaries in this directory
-# - cloudflared-linux-amd64
-# - cloudflared-linux-arm64
-# Download from: https://github.com/cloudflare/cloudflared/releases

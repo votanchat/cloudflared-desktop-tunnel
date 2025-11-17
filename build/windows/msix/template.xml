@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<MsixPackagingToolTemplate
+    xmlns="http://schemas.microsoft.com/msix/packaging/msixpackagingtool/template/2022">
+    <Settings
+        AllowTelemetry="false"
+        ApplyACLsToPackageFiles="true"
+        GenerateCommandLineFile="true"
+        AllowPromptForPassword="false">
+    </Settings>
+    <Installer
+        Path="cloudflared-desktop-tunnel-v3"
+        Arguments=""
+        InstallLocation="C:\Program Files\votanchat\Cloudflared Desktop Tunnel">
+    </Installer>
+    <PackageInformation
+        PackageName="Cloudflared Desktop Tunnel"
+        PackageDisplayName="Cloudflared Desktop Tunnel"
+        PublisherName="CN=votanchat"
+        PublisherDisplayName="votanchat"
+        Version="1.0.0.0"
+        PackageDescription="Cross-platform desktop app for managing Cloudflare Tunnels">
+        <Capabilities>
+            <Capability Name="runFullTrust" />
+            
+        </Capabilities>
+        <Applications>
+            <Application
+                Id="com.votanchat.cloudflared-desktop-tunnel"
+                Description="Cross-platform desktop app for managing Cloudflare Tunnels"
+                DisplayName="Cloudflared Desktop Tunnel"
+                ExecutableName="cloudflared-desktop-tunnel-v3"
+                EntryPoint="Windows.FullTrustApplication">
+                
+            </Application>
+        </Applications>
+        <Resources>
+            <Resource Language="en-us" />
+        </Resources>
+        <Dependencies>
+            <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.19041.0" />
+        </Dependencies>
+        <Properties>
+            <Framework>false</Framework>
+            <DisplayName>Cloudflared Desktop Tunnel</DisplayName>
+            <PublisherDisplayName>votanchat</PublisherDisplayName>
+            <Description>Cross-platform desktop app for managing Cloudflare Tunnels</Description>
+            <Logo>Assets\AppIcon.png</Logo>
+        </Properties>
+    </PackageInformation>
+    <SaveLocation PackagePath="cloudflared-desktop-tunnel-v3.msix" />
+    <PackageIntegrity>
+        <CertificatePath></CertificatePath>
+    </PackageIntegrity>
+</MsixPackagingToolTemplate>
