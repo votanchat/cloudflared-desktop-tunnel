@@ -3,6 +3,8 @@ package services
 import (
 	"context"
 	"fmt"
+
+	"github.com/votanchat/cloudflared-desktop-tunnel-v3/logger"
 )
 
 // AppService orchestrates all services
@@ -45,9 +47,14 @@ func NewAppService() *AppService {
 
 	// Start backend client
 	backendService.Start()
+	logger.AppLogger.Info("✅ AppService initialized")
+	logger.AppLogger.Info("   📡 Tunnel Name: %s", config.TunnelName)
+	logger.AppLogger.Info("   🌐 Backend URL: %s", config.BackendURL)
+	logger.AppLogger.Info("   🔌 Web Server Port: %d", config.WebServerPort)
 
 	// Auto-start tunnel if configured
 	if config.AutoStart {
+		logger.AppLogger.Info("Auto-start enabled, starting tunnel...")
 		go app.autoStartTunnel()
 	}
 
@@ -62,7 +69,7 @@ func (s *AppService) autoStartTunnel() {
 	}
 
 	if err := s.tunnelService.Start(token); err != nil {
-		// Log error
+		logger.AppLogger.Error("Failed to auto-start tunnel: %v", err)
 	}
 }
 
@@ -193,13 +200,13 @@ func (s *AppService) buildStatusResponse(tunnelRunning, webServerRunning bool, p
 func (s *AppService) StopAll() error {
 	if s.tunnelService != nil && s.tunnelService.IsRunning() {
 		if err := s.tunnelService.Stop(); err != nil {
-			// Log error
+			logger.AppLogger.Error("Failed to stop tunnel: %v", err)
 		}
 	}
 
 	if s.webServerService != nil && s.webServerService.IsRunning() {
 		if err := s.webServerService.Stop(); err != nil {
-			// Log error
+			logger.AppLogger.Error("Failed to stop web server: %v", err)
 		}
 	}
 

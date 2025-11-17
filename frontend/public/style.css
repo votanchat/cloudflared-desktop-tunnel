@@ -155,3 +155,25 @@ h1 {
     border: none;
     background-color: rgba(255, 255, 255, 1);
 }
+
+/* Modern UI Animations */
+@keyframes gradient {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.7; transform: scale(1.1); }
+}
+
+/* Smooth transitions for interactive elements */
+* {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}

@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/votanchat/cloudflared-desktop-tunnel-v3/binaries"
+	"github.com/votanchat/cloudflared-desktop-tunnel-v3/logger"
 )
 
 // TunnelService manages the cloudflared tunnel process
@@ -74,6 +75,13 @@ func (s *TunnelService) Start(token string) error {
 	}
 
 	s.running = true
+	logger.TunnelLogger.Info("✅ Tunnel started successfully")
+	logger.TunnelLogger.Info("   🏷️  Name: %s", s.tunnelName)
+	tokenPreview := token
+	if len(token) > 10 {
+		tokenPreview = token[:10] + "..."
+	}
+	logger.TunnelLogger.Info("   🔑 Token: %s", tokenPreview)
 
 	go s.readLogs(stdout, "stdout")
 	go s.readLogs(stderr, "stderr")
@@ -82,7 +90,7 @@ func (s *TunnelService) Start(token string) error {
 	if s.onTunnelStart != nil {
 		go func() {
 			if err := s.onTunnelStart(); err != nil {
-				// Log error but don't fail
+				logger.TunnelLogger.Error("Failed to execute onTunnelStart callback: %v", err)
 			}
 		}()
 	}
@@ -107,6 +115,7 @@ func (s *TunnelService) Stop() error {
 	}
 
 	s.running = false
+	logger.TunnelLogger.Info("⏹️  Tunnel stopped")
 	return nil
 }
 
@@ -279,7 +288,7 @@ func (s *TunnelService) readLogs(pipe io.ReadCloser, source string) {
 	}
 
 	if err := scanner.Err(); err != nil {
-		// Log error
+		logger.TunnelLogger.Error("Error reading tunnel logs from %s: %v", source, err)
 	}
 }
 

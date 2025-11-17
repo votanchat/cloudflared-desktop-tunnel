@@ -1,6 +1,7 @@
 package services
 
 import (
+	"github.com/votanchat/cloudflared-desktop-tunnel-v3/logger"
 	"fmt"
 	"net"
 	"sync"
@@ -22,7 +23,7 @@ func NewWebServerService() *WebServerService {
 	gin.SetMode(gin.ReleaseMode)
 
 	return &WebServerService{
-		engine: gin.Default(),
+		engine: nil, // Will be created on Start
 	}
 }
 
@@ -45,6 +46,8 @@ func (s *WebServerService) Start(port int) error {
 		return fmt.Errorf("failed to start web server on port %d: port in use or unavailable", port)
 	}
 
+	// Create new engine for each Start to avoid route registration conflicts
+	s.engine = gin.Default()
 	s.port = port
 	s.listener = listener
 
@@ -52,11 +55,13 @@ func (s *WebServerService) Start(port int) error {
 
 	go func() {
 		if err := s.engine.RunListener(listener); err != nil && err.Error() != "http: Server closed" {
-			// Log error
+			logger.ServerLogger.Error("Web server error: %v", err)
 		}
 	}()
 
 	s.running = true
+	logger.ServerLogger.Info("✅ Web server started")
+	logger.ServerLogger.Info("   🔌 Port: %d", port)
 	return nil
 }
 
@@ -70,9 +75,12 @@ func (s *WebServerService) Stop() error {
 	}
 
 	s.running = false
+	logger.ServerLogger.Info("⏹️  Web server stopped")
 	if s.listener != nil {
 		s.listener.Close()
 	}
+	// Reset engine to allow clean restart
+	s.engine = nil
 	return nil
 }
 

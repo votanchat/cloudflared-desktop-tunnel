@@ -1,284 +1,187 @@
 import { useState, useEffect } from 'react'
-// Bindings will be generated when running wails3 dev or wails3 build
-// Import path will be: "../bindings/github.com/votanchat/cloudflared-desktop-tunnel-v3/services"
-// For now, using a placeholder - update after bindings are generated
-// @ts-ignore
-import { AppService } from "../bindings/changeme/services"
+import { AppService } from "../bindings/github.com/votanchat/cloudflared-desktop-tunnel-v3/services"
 
 function App() {
-  const [tunnelStatus, setTunnelStatus] = useState<any>(null)
-  const [webServerStatus, setWebServerStatus] = useState<any>(null)
-  const [config, setConfig] = useState<any>(null)
-  const [manualToken, setManualToken] = useState<string>('')
+  const [token, setToken] = useState<string>('')
   const [loading, setLoading] = useState<boolean>(false)
+  const [status, setStatus] = useState<any>(null)
+  const [error, setError] = useState<string>('')
 
+  // Poll status every 2 seconds if tunnel is running
   useEffect(() => {
-    loadStatus()
-    const interval = setInterval(loadStatus, 2000)
+    if (!status?.running) return
+
+    const interval = setInterval(async () => {
+      try {
+        const tunnelStatus = await AppService.GetTunnelStatus()
+        const webServerStatus = await AppService.GetWebServerStatus()
+        setStatus({
+          running: true,
+          tunnel: tunnelStatus,
+          webServer: webServerStatus
+        })
+      } catch (err) {
+        console.error('Failed to fetch status:', err)
+      }
+    }, 2000)
+
     return () => clearInterval(interval)
-  }, [])
+  }, [status?.running])
 
-  const loadStatus = async () => {
-    try {
-      const [tunnel, webServer, cfg] = await Promise.all([
-        AppService.GetTunnelStatus(),
-        AppService.GetWebServerStatus(),
-        AppService.GetConfig()
-      ])
-      setTunnelStatus(tunnel)
-      setWebServerStatus(webServer)
-      setConfig(cfg)
-    } catch (err) {
-      console.error('Failed to load status:', err)
+  const handleStart = async () => {
+    if (!token.trim()) {
+      setError('Vui lòng nhập token')
+      return
     }
-  }
 
-  const handleStartTunnel = async () => {
     setLoading(true)
+    setError('')
     try {
-      await AppService.StartTunnel(manualToken || '')
-      setManualToken('')
-      await loadStatus()
+        await AppService.StartTunnel(token)
+        setToken('')
+      
+      // Get status after successful start
+      const tunnelStatus = await AppService.GetTunnelStatus()
+      const webServerStatus = await AppService.GetWebServerStatus()
+      setStatus({
+        running: true,
+        tunnel: tunnelStatus,
+        webServer: webServerStatus
+      })
     } catch (err: any) {
-      alert('Failed to start tunnel: ' + (err.message || err))
+      setError('Khởi động thất bại: ' + (err.message || err))
+      setStatus(null)
     } finally {
       setLoading(false)
     }
   }
 
-  const handleStopTunnel = async () => {
+  const handleStop = async () => {
     setLoading(true)
     try {
-      await AppService.StopTunnel()
-      await loadStatus()
+      await AppService.StopAll()
+      setStatus(null)
     } catch (err: any) {
-      alert('Failed to stop tunnel: ' + (err.message || err))
+      setError('Dừng thất bại: ' + (err.message || err))
     } finally {
       setLoading(false)
     }
   }
 
-  const handleStartWebServer = async () => {
-    setLoading(true)
-    try {
-      await AppService.StartWebServer(0)
-      await loadStatus()
-    } catch (err: any) {
-      alert('Failed to start web server: ' + (err.message || err))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleStopWebServer = async () => {
-    setLoading(true)
-    try {
-      await AppService.StopWebServer()
-      await loadStatus()
-    } catch (err: any) {
-      alert('Failed to stop web server: ' + (err.message || err))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const isTunnelRunning = tunnelStatus?.running || false
-  const isWebServerRunning = webServerStatus?.running || false
-
-  return (
-    <div style={styles.container}>
-      <div style={styles.content}>
-        <h1 style={styles.title}>Cloudflared Desktop Tunnel</h1>
-
-        {/* Tunnel Status */}
-        <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>Tunnel Status</h2>
-          <div style={styles.statusBox}>
-            <div style={styles.statusRow}>
-              <span style={styles.label}>Status:</span>
-              <span style={{
-                ...styles.statusBadge,
-                backgroundColor: isTunnelRunning ? '#4caf50' : '#f44336'
-              }}>
-                {isTunnelRunning ? 'Running' : 'Stopped'}
-              </span>
+  // Show status if running
+  if (status?.running) {
+    return (
+      <div className="w-full min-h-screen flex items-center justify-center bg-[#1b2636] p-4">
+        <div className="w-full max-w-md">
+          <div className="bg-[rgba(255,255,255,0.05)] backdrop-blur-xl rounded-2xl p-8 border border-[rgba(255,255,255,0.1)] shadow-2xl">
+            <div className="flex justify-center mb-6">
+              <div className="w-16 h-16 bg-green-500 rounded-lg flex items-center justify-center">
+                <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
             </div>
-            {tunnelStatus?.tunnelURL && (
-              <div style={styles.statusRow}>
-                <span style={styles.label}>URL:</span>
-                <span style={styles.value}>{tunnelStatus.tunnelURL}</span>
-              </div>
-            )}
-            {tunnelStatus?.tunnelName && (
-              <div style={styles.statusRow}>
-                <span style={styles.label}>Name:</span>
-                <span style={styles.value}>{tunnelStatus.tunnelName}</span>
-              </div>
-            )}
-          </div>
 
-          <div style={styles.controls}>
-            {!isTunnelRunning ? (
-              <>
-                <input
-                  type="text"
-                  placeholder="Manual token (optional)"
-                  value={manualToken}
-                  onChange={(e) => setManualToken(e.target.value)}
-                  style={styles.input}
-                />
-                <button
-                  onClick={handleStartTunnel}
-                  disabled={loading}
-                  style={styles.button}
-                >
-                  Start Tunnel
-                </button>
-              </>
-            ) : (
-              <button
-                onClick={handleStopTunnel}
-                disabled={loading}
-                style={{ ...styles.button, backgroundColor: '#f44336' }}
-              >
-                Stop Tunnel
-              </button>
-            )}
+            <h1 className="text-3xl font-bold text-center text-white mb-2">
+              Đang chạy
+            </h1>
+            <p className="text-sm text-center text-[rgba(255,255,255,0.7)] mb-6">
+              Tunnel đã được khởi động thành công
+            </p>
+
+            <div className="space-y-4 mb-6">
+              <div className="bg-[rgba(255,255,255,0.05)] rounded-lg p-4">
+                <div className="text-sm text-[rgba(255,255,255,0.7)] mb-1">Tunnel Status</div>
+                <div className="text-white font-semibold">
+                  {status.tunnel?.status || 'Running'}
+                </div>
+              </div>
+
+              <div className="bg-[rgba(255,255,255,0.05)] rounded-lg p-4">
+                <div className="text-sm text-[rgba(255,255,255,0.7)] mb-1">Web Server Status</div>
+                <div className="text-white font-semibold">
+                  {status.webServer?.status || 'Running'}
+                </div>
+                {status.webServer?.port && (
+                  <div className="text-xs text-[rgba(255,255,255,0.5)] mt-1">
+                    Port: {status.webServer.port}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <button
+              onClick={handleStop}
+              disabled={loading}
+              className="w-full py-3 px-4 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? 'Đang dừng...' : 'Dừng'}
+            </button>
           </div>
         </div>
+      </div>
+    )
+  }
 
-        {/* Web Server Status */}
-        <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>Web Server Status</h2>
-          <div style={styles.statusBox}>
-            <div style={styles.statusRow}>
-              <span style={styles.label}>Status:</span>
-              <span style={{
-                ...styles.statusBadge,
-                backgroundColor: isWebServerRunning ? '#4caf50' : '#f44336'
-              }}>
-                {isWebServerRunning ? 'Running' : 'Stopped'}
-              </span>
+  // Show login form
+  return (
+    <div className="w-full min-h-screen flex items-center justify-center bg-[#1b2636] p-4">
+      <div className="w-full max-w-md">
+        <div className="bg-[rgba(255,255,255,0.05)] backdrop-blur-xl rounded-2xl p-8 border border-[rgba(255,255,255,0.1)] shadow-2xl">
+          <div className="flex justify-center mb-6">
+            <div className="w-16 h-16 bg-[#60a5fa] rounded-lg flex items-center justify-center">
+              <svg 
+                className="w-10 h-10 text-yellow-400" 
+                fill="currentColor" 
+                viewBox="0 0 20 20"
+              >
+                <path 
+                  fillRule="evenodd" 
+                  d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" 
+                  clipRule="evenodd" 
+                />
+              </svg>
             </div>
-            {webServerStatus?.port && (
-              <div style={styles.statusRow}>
-                <span style={styles.label}>Port:</span>
-                <span style={styles.value}>{webServerStatus.port}</span>
-              </div>
-            )}
           </div>
 
-          <div style={styles.controls}>
-            {!isWebServerRunning ? (
-              <button
-                onClick={handleStartWebServer}
-                disabled={loading}
-                style={styles.button}
-              >
-                Start Web Server
-              </button>
-            ) : (
-              <button
-                onClick={handleStopWebServer}
-                disabled={loading}
-                style={{ ...styles.button, backgroundColor: '#f44336' }}
-              >
-                Stop Web Server
-              </button>
-            )}
+          <h1 className="text-3xl font-bold text-center text-white mb-2">
+            Cloudflared Tunnel
+          </h1>
+          <p className="text-sm text-center text-[rgba(255,255,255,0.7)] mb-6">
+            Nhập token để khởi động
+          </p>
+
+            <div className="mb-6">
+              <label className="block text-sm text-[rgba(255,255,255,0.7)] mb-2">
+                Access Token
+              </label>
+              <input
+                type="text"
+                placeholder="Nhập token của bạn"
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleStart()}
+                className="w-full px-4 py-3 rounded-lg bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] text-white placeholder-[rgba(255,255,255,0.4)] focus:outline-none focus:border-[#60a5fa] focus:ring-2 focus:ring-[#60a5fa]/20 transition-all"
+              />
           </div>
+
+          {error && (
+            <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-300 text-sm">
+              {error}
+            </div>
+          )}
+
+          <button
+            onClick={handleStart}
+            disabled={loading || !token.trim()}
+            className="w-full py-3 px-4 bg-[#60a5fa] hover:bg-[#3b82f6] text-white font-semibold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
+          >
+            {loading ? 'Đang khởi động...' : 'Khởi động'}
+          </button>
         </div>
       </div>
     </div>
   )
-}
-
-const styles = {
-  container: {
-    width: '100%',
-    height: '100vh',
-    backgroundColor: '#1a1a1a',
-    color: '#ffffff',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-  },
-  content: {
-    width: '100%',
-    maxWidth: '600px',
-    padding: '40px',
-  },
-  title: {
-    fontSize: '28px',
-    fontWeight: 'bold',
-    marginBottom: '30px',
-    textAlign: 'center' as const,
-  },
-  section: {
-    marginBottom: '30px',
-    backgroundColor: '#2a2a2a',
-    padding: '20px',
-    borderRadius: '8px',
-  },
-  sectionTitle: {
-    fontSize: '18px',
-    fontWeight: '600',
-    marginBottom: '15px',
-    color: '#ffffff',
-  },
-  statusBox: {
-    backgroundColor: '#1a1a1a',
-    padding: '15px',
-    borderRadius: '6px',
-    marginBottom: '15px',
-  },
-  statusRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '10px',
-  },
-  label: {
-    fontSize: '14px',
-    color: '#aaaaaa',
-  },
-  value: {
-    fontSize: '14px',
-    color: '#ffffff',
-    fontWeight: '500',
-  },
-  statusBadge: {
-    padding: '4px 12px',
-    borderRadius: '12px',
-    fontSize: '12px',
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  controls: {
-    display: 'flex',
-    gap: '10px',
-    flexDirection: 'column' as const,
-  },
-  input: {
-    padding: '10px',
-    borderRadius: '6px',
-    border: '1px solid #444',
-    backgroundColor: '#1a1a1a',
-    color: '#ffffff',
-    fontSize: '14px',
-  },
-  button: {
-    padding: '12px 24px',
-    borderRadius: '6px',
-    border: 'none',
-    backgroundColor: '#4caf50',
-    color: '#ffffff',
-    fontSize: '14px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    transition: 'background-color 0.2s',
-  },
 }
 
 export default App

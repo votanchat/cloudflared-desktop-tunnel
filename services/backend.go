@@ -1,6 +1,7 @@
 package services
 
 import (
+	"github.com/votanchat/cloudflared-desktop-tunnel-v3/logger"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -162,7 +163,7 @@ func (s *BackendService) tokenRefreshLoop() {
 			return
 		case <-ticker.C:
 			if _, err := s.FetchToken(); err != nil {
-				// Log error but continue
+				logger.BackendLogger.Warn("Failed to fetch token in background: %v", err)
 			}
 		}
 	}
