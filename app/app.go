@@ -23,6 +23,14 @@ func NewApp() *App {
 // so we can call the runtime methods
 func (a *App) Startup(ctx context.Context) {
 	a.ctx = ctx
+
+	// Initialize file logging first (only in build mode)
+	// This must be called before any logging
+	if err := InitFileLogging(); err != nil {
+		// If file logging fails, continue with console logging only
+		// This is expected in dev mode, so we don't log the error
+	}
+
 	appLogger.Info("Application starting up...")
 
 	// Initialize configuration
@@ -124,6 +132,9 @@ func (a *App) Shutdown(ctx context.Context) {
 			appLogger.Error("Error saving config: %v", err)
 		}
 	}
+
+	// Close file logging
+	CloseFileLogging()
 }
 
 // StartTunnel starts the cloudflared tunnel
