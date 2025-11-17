@@ -12,6 +12,7 @@ type App struct {
 	tunnel        *TunnelManager
 	config        *Config
 	backendClient *BackendClient
+	webServer     *WebServerManager
 }
 
 // NewApp creates a new App application struct
@@ -42,6 +43,29 @@ func (a *App) Startup(ctx context.Context) {
 	// Set config reference for route management
 	a.tunnel.SetConfig(a.config)
 
+	// Initialize web server manager
+	a.webServer = NewWebServerManager()
+
+	// Set callback to auto-start web server when tunnel starts successfully
+	a.tunnel.SetOnTunnelStart(func() error {
+		if !a.webServer.IsRunning() {
+			// Use fixed port from config
+			port := a.config.WebServerPort
+			if port <= 0 {
+				port = 8080 // Fallback to default port
+			}
+
+			err := a.webServer.StartWithPort(port)
+			if err != nil {
+				log.Printf("Warning: Failed to auto-start web server on port %d: %v", port, err)
+				return nil // Don't fail tunnel if web server fails
+			}
+			a.webServer.setupHTMLTemplate()
+			log.Printf("Web server auto-started successfully on port %d", port)
+		}
+		return nil
+	})
+
 	// Auto-start tunnel if configured
 	if a.config.AutoStart {
 		go func() {
@@ -65,6 +89,13 @@ func (a *App) DomReady(ctx context.Context) {
 // Shutdown is called when the app is closing
 func (a *App) Shutdown(ctx context.Context) {
 	log.Println("Application shutting down...")
+
+	// Stop web server if running
+	if a.webServer != nil && a.webServer.IsRunning() {
+		if err := a.webServer.Stop(); err != nil {
+			log.Printf("Error stopping web server: %v", err)
+		}
+	}
 
 	// Stop tunnel if running
 	if a.tunnel != nil {
@@ -123,9 +154,11 @@ func (a *App) StopTunnel() error {
 
 // GetTunnelStatus returns the current tunnel status
 func (a *App) GetTunnelStatus() map[string]interface{} {
+	tunnelURL := a.tunnel.GetTunnelURL()
 	return map[string]interface{}{
 		"running":    a.tunnel.IsRunning(),
 		"tunnelName": a.config.TunnelName,
+		"tunnelURL":  tunnelURL,
 		"logs":       a.tunnel.GetLogs(),
 	}
 }
@@ -173,4 +206,125 @@ func (a *App) RemoveRoute(hostname string) error {
 // GetRoutes returns all configured routes
 func (a *App) GetRoutes() []Route {
 	return a.config.Routes
+}
+
+// StartTunnelWithWebServer starts tunnel and automatically starts web server on success
+func (a *App) StartTunnelWithWebServer(manualToken string) (map[string]interface{}, error) {
+	if a.tunnel.IsRunning() {
+		return nil, fmt.Errorf("tunnel is already running")
+	}
+
+	// Start tunnel first (which also sets up the web server route)
+	if err := a.StartTunnel(manualToken); err != nil {
+		return nil, fmt.Errorf("failed to start tunnel: %w", err)
+	}
+
+	// Tunnel started successfully, now start web server
+	log.Println("Tunnel started successfully, starting web server...")
+
+	if a.webServer.IsRunning() {
+		return nil, fmt.Errorf("web server is already running")
+	}
+
+	// Start web server on configured port
+	port := a.config.WebServerPort
+	if port <= 0 {
+		port = 8080
+	}
+
+	err := a.webServer.StartWithPort(port)
+	if err != nil {
+		log.Printf("Warning: Failed to start web server on port %d: %v", port, err)
+		return map[string]interface{}{
+			"tunnel":           "running",
+			"webServer":        "failed",
+			"port":             0,
+			"error":            err.Error(),
+			"tunnelRunning":    true,
+			"webServerRunning": false,
+		}, nil
+	}
+
+	// Setup HTML routes for the web server
+	a.webServer.setupHTMLTemplate()
+
+	log.Printf("Web server started successfully on port %d", port)
+
+	return map[string]interface{}{
+		"tunnel":           "running",
+		"webServer":        "running",
+		"port":             port,
+		"status":           "running",
+		"tunnelRunning":    true,
+		"webServerRunning": true,
+	}, nil
+}
+
+// StartWebServerWithTunnel starts a web server with Gin and creates a tunnel to it
+func (a *App) StartWebServerWithTunnel(manualToken string) (map[string]interface{}, error) {
+	if a.webServer.IsRunning() {
+		return nil, fmt.Errorf("web server is already running")
+	}
+
+	// Start web server
+	port, err := a.webServer.Start()
+	if err != nil {
+		return nil, fmt.Errorf("failed to start web server: %w", err)
+	}
+
+	// Setup HTML routes for the web server
+	a.webServer.setupHTMLTemplate()
+
+	// Start the tunnel
+	tunnelService := fmt.Sprintf("http://localhost:%d", port)
+	if err := a.StartTunnel(manualToken); err != nil {
+		a.webServer.Stop()
+		return nil, fmt.Errorf("failed to start tunnel: %w", err)
+	}
+
+	log.Printf("Web server and tunnel started successfully on port %d", port)
+
+	return map[string]interface{}{
+		"port":   port,
+		"status": "running",
+		"url":    tunnelService,
+	}, nil
+}
+
+// StopWebServerWithTunnel stops both the web server and tunnel
+func (a *App) StopWebServerWithTunnel() error {
+	// Stop tunnel first
+	if a.tunnel != nil && a.tunnel.IsRunning() {
+		if err := a.tunnel.Stop(); err != nil {
+			log.Printf("Error stopping tunnel: %v", err)
+		}
+	}
+
+	// Stop web server
+	if a.webServer != nil && a.webServer.IsRunning() {
+		if err := a.webServer.Stop(); err != nil {
+			log.Printf("Error stopping web server: %v", err)
+		}
+	}
+
+	log.Println("Web server and tunnel stopped")
+	return nil
+}
+
+// GetWebServerStatus returns the current web server status
+func (a *App) GetWebServerStatus() map[string]interface{} {
+	running := false
+	port := 0
+
+	if a.webServer != nil {
+		running = a.webServer.IsRunning()
+		if running {
+			port = a.webServer.GetPort()
+		}
+	}
+
+	return map[string]interface{}{
+		"running": running,
+		"port":    port,
+	}
 }

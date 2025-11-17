@@ -19,7 +19,8 @@ type Config struct {
 	AutoStart       bool    `json:"autoStart"`
 	MinimizeToTray  bool    `json:"minimizeToTray"`
 	RefreshInterval int     `json:"refreshInterval"` // in seconds
-	Routes          []Route `json:"routes"`         // Domain routes for tunnel
+	WebServerPort   int     `json:"webServerPort"`   // Web server port (0 = random, >0 = fixed)
+	Routes          []Route `json:"routes"`          // Domain routes for tunnel
 }
 
 // DefaultConfig returns a default configuration
@@ -29,7 +30,8 @@ func DefaultConfig() *Config {
 		TunnelName:      "my-tunnel",
 		AutoStart:       false,
 		MinimizeToTray:  true,
-		RefreshInterval: 300, // 5 minutes
+		RefreshInterval: 300,       // 5 minutes
+		WebServerPort:   8080,      // Fixed port 8080 by default
 		Routes:          []Route{}, // Empty routes by default
 	}
 }

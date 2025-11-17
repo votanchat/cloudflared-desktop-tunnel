@@ -14,15 +14,19 @@ import (
 	"github.com/votanchat/cloudflared-desktop-tunnel/binaries"
 )
 
+// OnTunnelStart is a callback function when tunnel starts successfully
+type OnTunnelStart func() error
+
 // TunnelManager manages the cloudflared tunnel process
 type TunnelManager struct {
-	mu         sync.RWMutex
-	running    bool
-	cmd        *exec.Cmd
-	tunnelName string
-	logs       []string
-	binaryPath string  // Cached binary path
-	config     *Config // Reference to config for routes
+	mu            sync.RWMutex
+	running       bool
+	cmd           *exec.Cmd
+	tunnelName    string
+	logs          []string
+	binaryPath    string        // Cached binary path
+	config        *Config       // Reference to config for routes
+	onTunnelStart OnTunnelStart // Callback when tunnel starts
 }
 
 // NewTunnelManager creates a new tunnel manager
@@ -38,6 +42,13 @@ func (tm *TunnelManager) SetConfig(config *Config) {
 	tm.mu.Lock()
 	defer tm.mu.Unlock()
 	tm.config = config
+}
+
+// SetOnTunnelStart sets the callback function to be called when tunnel starts successfully
+func (tm *TunnelManager) SetOnTunnelStart(callback OnTunnelStart) {
+	tm.mu.Lock()
+	defer tm.mu.Unlock()
+	tm.onTunnelStart = callback
 }
 
 // Start starts the cloudflared tunnel with the given token
@@ -60,24 +71,9 @@ func (tm *TunnelManager) Start(token string) error {
 	log.Printf("Using cloudflared binary: %s", binaryPath)
 	log.Printf("Runtime: GOOS=%s, GOARCH=%s", runtime.GOOS, runtime.GOARCH)
 
-	// Check if we have routes configured
-	if tm.config != nil && len(tm.config.Routes) > 0 {
-		// Use config file with routes
-		configPath, err := tm.generateConfigFile(token)
-		if err != nil {
-			return fmt.Errorf("failed to generate config file: %w", err)
-		}
-		log.Printf("Using config file with %d route(s): %s", len(tm.config.Routes), configPath)
-		for _, route := range tm.config.Routes {
-			log.Printf("  Route: %s -> %s", route.Hostname, route.Service)
-		}
-		// Use both --token and --config (token for auth, config for routes)
-		tm.cmd = exec.Command(binaryPath, "tunnel", "run", "--token", token, "--config", configPath)
-	} else {
-		// Use token directly (no routes, routes managed via Cloudflare Dashboard)
-		log.Println("Using token mode (routes managed via Cloudflare Dashboard)")
-		tm.cmd = exec.Command(binaryPath, "tunnel", "run", "--token", token)
-	}
+	// Always use token mode (routes managed via Cloudflare Dashboard)
+	log.Println("Using token mode (routes managed via Cloudflare Dashboard)")
+	tm.cmd = exec.Command(binaryPath, "tunnel", "run", "--token", token)
 
 	// Capture stdout and stderr
 	stdout, err := tm.cmd.StdoutPipe()
@@ -104,6 +100,15 @@ func (tm *TunnelManager) Start(token string) error {
 
 	// Monitor process
 	go tm.monitorProcess()
+
+	// Call onTunnelStart callback if set
+	if tm.onTunnelStart != nil {
+		go func() {
+			if err := tm.onTunnelStart(); err != nil {
+				log.Printf("Error in onTunnelStart callback: %v", err)
+			}
+		}()
+	}
 
 	return nil
 }
@@ -145,6 +150,34 @@ func (tm *TunnelManager) GetLogs() []string {
 	tm.mu.RLock()
 	defer tm.mu.RUnlock()
 	return tm.logs
+}
+
+// GetTunnelURL extracts tunnel URL from logs (looks for cURL URL pattern)
+func (tm *TunnelManager) GetTunnelURL() string {
+	tm.mu.RLock()
+	defer tm.mu.RUnlock()
+
+	// Look for URL in logs (cloudflared prints URLs like "https://xxx.trycloudflare.com")
+	for _, log := range tm.logs {
+		// Match patterns like https://xxx.trycloudflare.com or https://xxx.cloudflare.com
+		if strings.Contains(log, "https://") && (strings.Contains(log, "trycloudflare.com") || strings.Contains(log, "cloudflare.com")) {
+			// Extract URL from log line
+			start := strings.Index(log, "https://")
+			if start != -1 {
+				// Find end of URL (space or end of line)
+				end := strings.Index(log[start:], " ")
+				if end == -1 {
+					end = len(log[start:])
+				}
+				url := log[start : start+end]
+				// Validate URL format
+				if strings.Contains(url, ".") {
+					return url
+				}
+			}
+		}
+	}
+	return ""
 }
 
 // ensureBinary ensures the cloudflared binary is downloaded and ready to use
@@ -243,83 +276,6 @@ func getCacheDir() (string, error) {
 	}
 
 	return cacheDir, nil
-}
-
-// generateConfigFile generates a cloudflared YAML config file with routes
-func (tm *TunnelManager) generateConfigFile(token string) (string, error) {
-	// Get config directory
-	configDir, err := getConfigDir()
-	if err != nil {
-		return "", fmt.Errorf("failed to get config dir: %w", err)
-	}
-
-	configPath := filepath.Join(configDir, "tunnel-config.yaml")
-
-	// Build YAML content with pre-allocated capacity
-	yaml := strings.Builder{}
-	yaml.Grow(256 + len(tm.config.Routes)*64) // Pre-allocate for efficiency
-	yaml.WriteString("# Cloudflared tunnel configuration\n")
-	yaml.WriteString("# Generated automatically by cloudflared-desktop-tunnel\n\n")
-
-	// Note: cloudflared doesn't support token in config file
-	// We'll use --token flag separately, config file only for ingress routes
-	yaml.WriteString("# Tunnel will be authenticated via --token flag\n\n")
-
-	// Add ingress routes
-	yaml.WriteString("ingress:\n")
-	for _, route := range tm.config.Routes {
-		yaml.WriteString("  - hostname: ")
-		yaml.WriteString(route.Hostname)
-		yaml.WriteString("\n    service: ")
-		yaml.WriteString(route.Service)
-		yaml.WriteString("\n")
-	}
-
-	// Add catch-all rule (required by cloudflared)
-	yaml.WriteString("  - service: http_status:404\n")
-
-	// Write to file
-	yamlBytes := []byte(yaml.String())
-	if err := os.WriteFile(configPath, yamlBytes, 0644); err != nil {
-		return "", fmt.Errorf("failed to write config file: %w", err)
-	}
-
-	log.Printf("Generated tunnel config file: %s", configPath)
-	return configPath, nil
-}
-
-// getConfigDir returns the config directory for storing tunnel config files
-func getConfigDir() (string, error) {
-	// Use OS-specific config directory
-	var baseDir string
-	var err error
-
-	switch runtime.GOOS {
-	case "darwin":
-		homeDir, _ := os.UserHomeDir()
-		baseDir = filepath.Join(homeDir, "Library", "Application Support")
-	case "windows":
-		baseDir, err = os.UserConfigDir()
-		if err != nil {
-			return "", err
-		}
-	default: // linux
-		homeDir, _ := os.UserHomeDir()
-		xdgConfig := os.Getenv("XDG_CONFIG_HOME")
-		if xdgConfig != "" {
-			baseDir = xdgConfig
-		} else {
-			baseDir = filepath.Join(homeDir, ".config")
-		}
-	}
-
-	// Create app-specific subdirectory
-	configDir := filepath.Join(baseDir, "cloudflared-desktop-tunnel")
-	if err := os.MkdirAll(configDir, 0755); err != nil {
-		return "", fmt.Errorf("failed to create config directory: %w", err)
-	}
-
-	return configDir, nil
 }
 
 // readLogs reads logs from the given pipe and stores them
