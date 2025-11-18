@@ -3,6 +3,8 @@ package main
 import (
 	"embed"
 	"log"
+	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -288,6 +290,95 @@ func main() {
 				}()
 			}
 		})
+	})
+
+	// Handle deeplink/URL scheme
+	app.Event.OnApplicationEvent(events.Common.ApplicationLaunchedWithUrl, func(event *application.ApplicationEvent) {
+		urlString := event.Context().URL()
+		if urlString != "" {
+			logger.AppLogger.Info("App launched with URL: %s", urlString)
+			// Show window when deeplink is opened
+			application.InvokeAsync(func() {
+				defer func() {
+					if r := recover(); r != nil {
+						logger.AppLogger.Error("Error handling deeplink: %v", r)
+					}
+				}()
+				window := ensureWindow()
+				if window != nil {
+					// Unminimize if minimized
+					if window.IsMinimised() {
+						window.UnMinimise()
+					}
+					// Show window
+					window.Show()
+					// Focus after a small delay
+					go func() {
+						time.Sleep(100 * time.Millisecond)
+						application.InvokeAsync(func() {
+							defer func() {
+								if r := recover(); r != nil {
+									logger.AppLogger.Error("Error focusing window from deeplink: %v", r)
+								}
+							}()
+							window := ensureWindow()
+							if window != nil {
+								window.Focus()
+							}
+						})
+					}()
+					// Parse and process the deeplink URL
+					parsedURL, err := url.Parse(urlString)
+					if err != nil {
+						logger.AppLogger.Error("Failed to parse deeplink URL: %v", err)
+						return
+					}
+
+					// Handle different deeplink actions
+					scheme := parsedURL.Scheme
+					host := parsedURL.Host
+					path := strings.TrimPrefix(parsedURL.Path, "/")
+					query := parsedURL.Query()
+
+					logger.AppLogger.Info("Deeplink parsed - Scheme: %s, Host: %s, Path: %s", scheme, host, path)
+
+					// Example: cloudflared-tunnel://start?token=xxx
+					// Example: cloudflared-tunnel://stop
+					// Example: cloudflared-tunnel://settings
+					switch path {
+					case "start":
+						token := query.Get("token")
+						if token != "" {
+							logger.AppLogger.Info("Starting tunnel via deeplink with token...")
+							go func() {
+								if err := appService.StartTunnel(token); err != nil {
+									logger.AppLogger.Error("Failed to start tunnel via deeplink: %v", err)
+								} else {
+									logger.AppLogger.Info("Tunnel started successfully via deeplink")
+								}
+							}()
+						} else {
+							logger.AppLogger.Warn("Deeplink start action requires token parameter")
+						}
+					case "stop":
+						logger.AppLogger.Info("Stopping tunnel via deeplink...")
+						go func() {
+							if err := appService.StopTunnel(); err != nil {
+								logger.AppLogger.Error("Failed to stop tunnel via deeplink: %v", err)
+							} else {
+								logger.AppLogger.Info("Tunnel stopped successfully via deeplink")
+							}
+						}()
+					case "settings", "config":
+						logger.AppLogger.Info("Opening settings via deeplink...")
+						// Navigate to settings page if needed
+						// window.SetURL("/settings")
+					default:
+						logger.AppLogger.Info("Deeplink action not recognized: %s", path)
+					}
+				}
+			})
+		}
 	})
 
 	// Handle shutdown

@@ -23,5 +23,16 @@
             <string>true</string>
         <key>NSHumanReadableCopyright</key>
             <string>© now, My Company</string>
+        <key>CFBundleURLTypes</key>
+            <array>
+                <dict>
+                    <key>CFBundleURLName</key>
+                    <string>com.votanchat.cloudflared-desktop-tunnel</string>
+                    <key>CFBundleURLSchemes</key>
+                    <array>
+                        <string>cloudflared-tunnel</string>
+                    </array>
+                </dict>
+            </array>
     </dict>
 </plist>
