@@ -120,7 +120,7 @@ func main() {
 			mainWindow = createWindow()
 			// Re-attach to system tray
 			systemTray.AttachWindow(mainWindow)
-			logger.AppLogger.Info("Window recreated and attached to system tray")
+			logger.AppLogger.Info("Window recreated and attached to system tray from window manager check")
 			return mainWindow
 		}
 
@@ -144,7 +144,7 @@ func main() {
 			mainWindow = createWindow()
 			// Re-attach to system tray
 			systemTray.AttachWindow(mainWindow)
-			logger.AppLogger.Info("Window recreated and attached to system tray")
+			logger.AppLogger.Info("Window recreated and attached to system tray from accessible check")
 		}
 		return mainWindow
 	}
@@ -154,7 +154,7 @@ func main() {
 
 	// Create system tray menu
 	menu := application.NewMenu()
-	showMenuItem := menu.Add("Hiển thị")
+	showMenuItem := menu.Add("Show")
 	showMenuItem.OnClick(func(ctx *application.Context) {
 		logger.AppLogger.Info("Showing window from system tray menu...")
 		application.InvokeAsync(func() {
@@ -172,7 +172,7 @@ func main() {
 			window.Show()
 			// Focus after a small delay
 			go func() {
-				time.Sleep(100 * time.Millisecond)
+				time.Sleep(10 * time.Millisecond)
 				application.InvokeAsync(func() {
 					defer func() {
 						if r := recover(); r != nil {
@@ -188,7 +188,7 @@ func main() {
 		})
 	})
 	menu.AddSeparator()
-	quitMenuItem := menu.Add("Thoát")
+	quitMenuItem := menu.Add("Quit")
 	quitMenuItem.OnClick(func(ctx *application.Context) {
 		logger.AppLogger.Info("Quit requested from system tray...")
 		appService.Shutdown()
@@ -275,7 +275,7 @@ func main() {
 				window.Show()
 				// Focus after a small delay
 				go func() {
-					time.Sleep(100 * time.Millisecond)
+					time.Sleep(10 * time.Millisecond)
 					application.InvokeAsync(func() {
 						defer func() {
 							if r := recover(); r != nil {
