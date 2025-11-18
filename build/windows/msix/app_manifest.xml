@@ -41,6 +41,13 @@
       <Extensions>
         <desktop:Extension Category="windows.fullTrustProcess" Executable="cloudflared-desktop-tunnel-v3" />
         
+        <!-- Protocol handler for cloudflared-tunnel:// -->
+        <uap:Extension Category="windows.protocol">
+          <uap:Protocol Name="cloudflared-tunnel">
+            <uap:DisplayName>Cloudflared Desktop Tunnel Protocol</uap:DisplayName>
+          </uap:Protocol>
+        </uap:Extension>
+        
       </Extensions>
     </Application>
   </Applications>

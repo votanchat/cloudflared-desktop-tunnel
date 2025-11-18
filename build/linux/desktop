@@ -9,5 +9,7 @@ Type=Application
 Icon=cloudflared-desktop-tunnel-v3
 Categories=Utility;
 StartupWMClass=cloudflared-desktop-tunnel-v3
+# Register URL scheme handler
+MimeType=x-scheme-handler/cloudflared-tunnel;
 
  
