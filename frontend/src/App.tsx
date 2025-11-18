@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { AppService } from "../bindings/github.com/votanchat/cloudflared-desktop-tunnel-v3/services"
+import { ErrorPopup } from './ErrorPopup'
 
 function App() {
   const [token, setToken] = useState<string>('')
@@ -15,8 +16,13 @@ function App() {
       try {
         const tunnelStatus = await AppService.GetTunnelStatus()
         const webServerStatus = await AppService.GetWebServerStatus()
+        
+        if (!tunnelStatus.running || !webServerStatus.running) {
+          await AppService.StopAll()
+        }
+        
         setStatus({
-          running: true,
+          running: tunnelStatus.running && webServerStatus.running,
           tunnel: tunnelStatus,
           webServer: webServerStatus
         })
@@ -30,7 +36,7 @@ function App() {
 
   const handleStart = async () => {
     if (!token.trim()) {
-      setError('Vui lòng nhập token')
+      setError('Please enter a token')
       return
     }
 
@@ -49,7 +55,7 @@ function App() {
         webServer: webServerStatus
       })
     } catch (err: any) {
-      setError('Khởi động thất bại: ' + (err.message || err))
+      setError('Starting failed: ' + (err.message || err))
       setStatus(null)
     } finally {
       setLoading(false)
@@ -62,7 +68,7 @@ function App() {
       await AppService.StopAll()
       setStatus(null)
     } catch (err: any) {
-      setError('Dừng thất bại: ' + (err.message || err))
+      setError('Stopping failed: ' + (err.message || err))
     } finally {
       setLoading(false)
     }
@@ -72,6 +78,7 @@ function App() {
   if (status?.running) {
     return (
       <div className="w-full min-h-screen flex items-center justify-center bg-[#1b2636] p-4">
+        <ErrorPopup />
         <div className="w-full max-w-md">
           <div className="bg-[rgba(255,255,255,0.05)] backdrop-blur-xl rounded-2xl p-8 border border-[rgba(255,255,255,0.1)] shadow-2xl">
             <div className="flex justify-center mb-6">
@@ -83,24 +90,24 @@ function App() {
             </div>
 
             <h1 className="text-3xl font-bold text-center text-white mb-2">
-              Đang chạy
+              Running
             </h1>
             <p className="text-sm text-center text-[rgba(255,255,255,0.7)] mb-6">
-              Tunnel đã được khởi động thành công
+              Tunnel has been started successfully
             </p>
 
             <div className="space-y-4 mb-6">
               <div className="bg-[rgba(255,255,255,0.05)] rounded-lg p-4">
                 <div className="text-sm text-[rgba(255,255,255,0.7)] mb-1">Tunnel Status</div>
                 <div className="text-white font-semibold">
-                  {status.tunnel?.status || 'Running'}
+                  {status.tunnel?.running ? 'Running' : 'Stopped'}
                 </div>
               </div>
 
               <div className="bg-[rgba(255,255,255,0.05)] rounded-lg p-4">
                 <div className="text-sm text-[rgba(255,255,255,0.7)] mb-1">Web Server Status</div>
                 <div className="text-white font-semibold">
-                  {status.webServer?.status || 'Running'}
+                  {status.webServer?.running ? 'Running' : 'Stopped'}
                 </div>
                 {status.webServer?.port && (
                   <div className="text-xs text-[rgba(255,255,255,0.5)] mt-1">
@@ -115,7 +122,7 @@ function App() {
               disabled={loading}
               className="w-full py-3 px-4 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Đang dừng...' : 'Dừng'}
+              {loading ? 'Stopping...' : 'Stop'}
             </button>
           </div>
         </div>
@@ -126,6 +133,7 @@ function App() {
   // Show login form
   return (
     <div className="w-full min-h-screen flex items-center justify-center bg-[#1b2636] p-4">
+      <ErrorPopup />
       <div className="w-full max-w-md">
         <div className="bg-[rgba(255,255,255,0.05)] backdrop-blur-xl rounded-2xl p-8 border border-[rgba(255,255,255,0.1)] shadow-2xl">
           <div className="flex justify-center mb-6">
@@ -148,16 +156,16 @@ function App() {
             Cloudflared Tunnel
           </h1>
           <p className="text-sm text-center text-[rgba(255,255,255,0.7)] mb-6">
-            Nhập token để khởi động
+            Enter token to start
           </p>
 
             <div className="mb-6">
               <label className="block text-sm text-[rgba(255,255,255,0.7)] mb-2">
-                Access Token
+                Token
               </label>
               <input
                 type="text"
-                placeholder="Nhập token của bạn"
+                placeholder="Enter your token"
                 value={token}
                 onChange={(e) => setToken(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleStart()}
@@ -176,7 +184,7 @@ function App() {
             disabled={loading || !token.trim()}
             className="w-full py-3 px-4 bg-[#60a5fa] hover:bg-[#3b82f6] text-white font-semibold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
           >
-            {loading ? 'Đang khởi động...' : 'Khởi động'}
+            {loading ? 'Starting...' : 'Start'}
           </button>
         </div>
       </div>

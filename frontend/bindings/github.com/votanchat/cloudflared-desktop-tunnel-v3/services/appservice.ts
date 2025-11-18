@@ -24,6 +24,13 @@ export function GetConfig(): $CancellablePromise<$models.Config | null> {
 }
 
 /**
+ * GetLastTunnelError returns the last tunnel error and clears it
+ */
+export function GetLastTunnelError(): $CancellablePromise<string> {
+    return $Call.ByID(2124439973);
+}
+
+/**
  * GetTunnelStatus returns the current tunnel status
  */
 export function GetTunnelStatus(): $CancellablePromise<{ [_: string]: any }> {

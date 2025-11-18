@@ -3,17 +3,20 @@ package services
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/votanchat/cloudflared-desktop-tunnel-v3/logger"
 )
 
 // AppService orchestrates all services
 type AppService struct {
-	configService   *ConfigService
-	tunnelService   *TunnelService
-	backendService  *BackendService
+	configService    *ConfigService
+	tunnelService    *TunnelService
+	backendService   *BackendService
 	webServerService *WebServerService
-	ctx             context.Context
+	ctx              context.Context
+	lastError        string
+	errorMutex       sync.RWMutex
 }
 
 // NewAppService creates a new app service
@@ -24,6 +27,14 @@ func NewAppService() *AppService {
 	tunnelService := NewTunnelService(config.TunnelName, configService)
 	backendService := NewBackendService(config.BackendURL)
 	webServerService := NewWebServerService()
+
+	app := &AppService{
+		configService:    configService,
+		tunnelService:    tunnelService,
+		backendService:   backendService,
+		webServerService: webServerService,
+		ctx:              context.Background(),
+	}
 
 	// Set up tunnel callback to auto-start web server
 	tunnelService.SetOnTunnelStart(func() error {
@@ -37,13 +48,12 @@ func NewAppService() *AppService {
 		return webServerService.Start(port)
 	})
 
-	app := &AppService{
-		configService:   configService,
-		tunnelService:   tunnelService,
-		backendService:  backendService,
-		webServerService: webServerService,
-		ctx:             context.Background(),
-	}
+	// Set up tunnel error callback to store error for frontend
+	tunnelService.SetOnTunnelError(func(message string) {
+		app.errorMutex.Lock()
+		app.lastError = message
+		app.errorMutex.Unlock()
+	})
 
 	// Start backend client
 	backendService.Start()
@@ -108,6 +118,16 @@ func (s *AppService) StopTunnel() error {
 // GetTunnelStatus returns the current tunnel status
 func (s *AppService) GetTunnelStatus() map[string]interface{} {
 	return s.tunnelService.GetStatus()
+}
+
+// GetLastTunnelError returns the last tunnel error and clears it
+func (s *AppService) GetLastTunnelError() string {
+	s.errorMutex.Lock()
+	defer s.errorMutex.Unlock()
+
+	error := s.lastError
+	s.lastError = "" // Clear error after reading
+	return error
 }
 
 // GetConfig returns the current configuration
@@ -230,4 +250,3 @@ func (s *AppService) Shutdown() {
 		s.configService.Save(config)
 	}
 }
-

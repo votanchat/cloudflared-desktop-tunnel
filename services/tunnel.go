@@ -25,6 +25,7 @@ type TunnelService struct {
 	binaryPath    string
 	configService *ConfigService
 	onTunnelStart func() error
+	onTunnelError func(message string)
 }
 
 // NewTunnelService creates a new tunnel service
@@ -41,6 +42,13 @@ func (s *TunnelService) SetOnTunnelStart(callback func() error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.onTunnelStart = callback
+}
+
+// SetOnTunnelError sets the callback function to be called when tunnel encounters an error
+func (s *TunnelService) SetOnTunnelError(callback func(message string)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.onTunnelError = callback
 }
 
 // Start starts the cloudflared tunnel with the given token
@@ -94,6 +102,16 @@ func (s *TunnelService) Start(token string) error {
 			}
 		}()
 	}
+
+	go func() {
+		if err := s.cmd.Wait(); err != nil {
+			s.mu.Lock()
+			defer s.mu.Unlock()
+			s.onTunnelError(err.Error() + " " + s.logs[len(s.logs)-3])
+			s.running = false
+			s.logs = append(s.logs, fmt.Sprintf("Process exited: %v", err))
+		}
+	}()
 
 	return nil
 }
@@ -279,6 +297,14 @@ func (s *TunnelService) readLogs(pipe io.ReadCloser, source string) {
 			continue
 		}
 
+		// Show log in console
+		// If stderr, show as error; otherwise show as info
+		if source == "stderr" {
+			logger.TunnelLogger.Error("[stderr] %s", line)
+		} else {
+			logger.TunnelLogger.Info("[stdout] %s", line)
+		}
+
 		s.mu.Lock()
 		s.logs = append(s.logs, line)
 		if len(s.logs) > maxLogLines {
@@ -332,4 +358,3 @@ func (l *binaryLoggerAdapter) Error(format string, args ...interface{}) {
 func (l *binaryLoggerAdapter) Debug(format string, args ...interface{}) {
 	fmt.Printf("[BINARY] DEBUG: "+format+"\n", args...)
 }
-

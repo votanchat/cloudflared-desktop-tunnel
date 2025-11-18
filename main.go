@@ -345,7 +345,8 @@ func main() {
 					// Example: cloudflared-tunnel://start?token=xxx
 					// Example: cloudflared-tunnel://stop
 					// Example: cloudflared-tunnel://settings
-					switch path {
+					logger.AppLogger.Info("Deeplink path: %s", path)
+					switch host {
 					case "start":
 						token := query.Get("token")
 						if token != "" {
