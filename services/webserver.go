@@ -1,10 +1,11 @@
 package services
 
 import (
-	"github.com/votanchat/cloudflared-desktop-tunnel-v3/logger"
 	"fmt"
 	"net"
 	"sync"
+
+	"github.com/votanchat/cloudflared-desktop-tunnel-v3/logger"
 
 	"github.com/gin-gonic/gin"
 )
@@ -188,4 +189,3 @@ func (s *WebServerService) statusPageHandler(c *gin.Context) {
 </html>`, port)
 	c.String(200, html)
 }
-
