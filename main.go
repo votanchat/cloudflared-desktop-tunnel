@@ -17,7 +17,7 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
-//go:embed build/appicon.png
+//go:embed build/gateway_tunnel_icon.svg
 var trayIconBytes []byte
 
 func main() {
@@ -94,7 +94,7 @@ func main() {
 
 	// Set system tray icon (use template icon for macOS for better appearance)
 	if len(trayIconBytes) > 0 {
-		systemTray.SetTemplateIcon(trayIconBytes)
+		systemTray.SetIcon(trayIconBytes)
 		logger.AppLogger.Info("✅ System tray icon set")
 	} else {
 		logger.AppLogger.Warn("⚠️  System tray icon not found, using default")
